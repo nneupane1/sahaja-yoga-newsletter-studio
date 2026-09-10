@@ -1,0 +1,660 @@
+"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
+  Pie, PieChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis,
+} from "recharts";
+import {
+  Activity, ArrowDownToLine, ArrowRight, BarChart3, Bell, BookOpen, Calendar,
+  CalendarDays, Check, CheckCircle2, ChevronDown, Clock3, Copy, Download,
+  ExternalLink, Eye, FileBarChart, FileText, Gauge, Image as ImageIcon,
+  LayoutDashboard, Link2, Mail, MailCheck, MapPin, Menu, MessageCircle,
+  MoreHorizontal, MousePointerClick, Plus, RefreshCw, Search, Send, Settings,
+  SlidersHorizontal, Sparkles, Upload, UserCheck, UserPlus, Users, Workflow,
+  X, Zap,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Toaster } from "@/components/ui/sonner";
+import {
+  engagementData, growthData, initialEvents, initialNewsletters,
+  initialSubscribers, navItems, sources, trendData,
+} from "./data";
+import type {
+  AutomationKey, EventItem, Newsletter, Subscriber, ViewId,
+} from "./data";
+import { EditorView } from "./editor-view";
+
+declare global {
+  interface Document {
+    modelContext?: {
+      registerTool: (tool: {
+        name: string;
+        title?: string;
+        description: string;
+        inputSchema: Record<string, unknown>;
+        annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
+        execute: (input: unknown) => unknown | Promise<unknown>;
+      }, options?: { signal?: AbortSignal }) => void | Promise<void>;
+    };
+  }
+}
+
+const chartTooltipStyle = {
+  border: "1px solid #e3e7f0",
+  borderRadius: 12,
+  boxShadow: "0 12px 30px rgba(24, 34, 64, .1)",
+  fontSize: 12,
+};
+
+function usePersistentState<T>(key: string, initialValue: T) {
+  const [value, setValue] = useState(initialValue);
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(key);
+      if (saved) setValue(JSON.parse(saved));
+    } catch { /* keep demo defaults */ }
+    hydrated.current = true;
+  }, [key]);
+
+  useEffect(() => {
+    if (!hydrated.current) return;
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+
+  return [value, setValue] as const;
+}
+
+export default function Home() {
+  const [access, setAccess] = useState<"loading" | "ready" | "signed-out" | "forbidden" | "error">("loading");
+  const [backendStatus, setBackendStatus] = useState<{ runtime?: string; provider?: { connected?: boolean; name?: string; listName?: string; memberCount?: number }; counts?: { campaigns?: number; subscribers?: number; events?: number } } | null>(null);
+  const [activeView, setActiveView] = useState<ViewId>("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [newsletterOpen, setNewsletterOpen] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
+  const [previewNewsletter, setPreviewNewsletter] = useState<Newsletter | null>(null);
+  const [newsletters, setNewsletters] = usePersistentState("sy-newsletters", initialNewsletters);
+  const [events, setEvents] = usePersistentState("sy-events", initialEvents);
+  const [subscribers, setSubscribers] = usePersistentState("sy-subscribers", initialSubscribers);
+  const [automations, setAutomations] = usePersistentState<Record<AutomationKey, boolean>>(
+    "sy-automations",
+    { welcome: true, eventReminder: true, weekly: true, followup: false },
+  );
+  const csvInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/status").then(async (response) => {
+      const data = await response.json().catch(() => ({})) as any;
+      if (response.status === 401) return setAccess("signed-out");
+      if (response.status === 403) return setAccess("forbidden");
+      if (!response.ok) return setAccess("error");
+      setBackendStatus(data); setAccess("ready");
+    }).catch(() => setAccess("error"));
+  }, []);
+
+  useEffect(() => {
+    const context = document.modelContext;
+    if (!context?.registerTool) return;
+    const lifecycle = new AbortController();
+    const asRecord = (input: unknown) => {
+      if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Input must be an object");
+      return input as Record<string, unknown>;
+    };
+    const tools = [
+      context.registerTool({
+        name: "read_upcoming_events",
+        title: "Read upcoming events",
+        description: "Return the upcoming Sahaja Yoga gatherings currently shown in this workspace.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: true, untrustedContentHint: false },
+        execute: () => events.map(({ title, date, time, location, format, rsvps, capacity }) => ({ title, date, time, location, format, rsvps, capacity })),
+      }, { signal: lifecycle.signal }),
+      context.registerTool({
+        name: "navigate_workspace",
+        title: "Open a workspace section",
+        description: "Navigate the visible app to a named section such as newsletters, events, subscribers, RSVPs, analytics, or settings.",
+        inputSchema: { type: "object", properties: { view: { type: "string", enum: navItems.map((item) => item.id) } }, required: ["view"], additionalProperties: false },
+        annotations: { readOnlyHint: true, untrustedContentHint: false },
+        execute: (input) => { const view = asRecord(input).view; if (typeof view !== "string" || !navItems.some((item) => item.id === view)) throw new Error("Unknown workspace view"); setActiveView(view as ViewId); return { activeView: view }; },
+      }, { signal: lifecycle.signal }),
+      context.registerTool({
+        name: "create_newsletter_draft",
+        title: "Create newsletter draft",
+        description: "Create a browser-local newsletter draft and show it in the newsletters workspace.",
+        inputSchema: { type: "object", properties: { title: { type: "string", minLength: 1 }, subject: { type: "string", minLength: 1 } }, required: ["title", "subject"], additionalProperties: false },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+        execute: (input) => { const data = asRecord(input); if (typeof data.title !== "string" || !data.title.trim() || typeof data.subject !== "string" || !data.subject.trim()) throw new Error("Title and subject are required"); const item: Newsletter = { id: `tool-${Date.now()}`, title: data.title.trim(), subject: data.subject.trim(), status: "Draft", date: "Just now", sent: 0, openRate: 0, clickRate: 0, rsvps: 0 }; setNewsletters((current) => [item, ...current]); setActiveView("newsletters"); return { id: item.id, status: item.status, title: item.title }; },
+      }, { signal: lifecycle.signal }),
+    ];
+    void Promise.all(tools.map((item) => Promise.resolve(item))).catch(() => undefined);
+    return () => lifecycle.abort();
+  }, [events, setNewsletters]);
+
+  const changeView = (view: ViewId) => {
+    setActiveView(view);
+    setMobileNavOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const addNewsletter = (item: Newsletter) => {
+    setNewsletters((current) => [item, ...current]);
+    setNewsletterOpen(false);
+    toast.success("Newsletter draft created");
+  };
+
+  const addEvent = (item: EventItem) => {
+    setEvents((current) => [item, ...current]);
+    setEventOpen(false);
+    toast.success("Event added to the calendar");
+  };
+
+  const importSubscribers = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const lines = String(reader.result).split(/\r?\n/).filter(Boolean);
+      const dataLines = lines[0]?.toLowerCase().includes("email") ? lines.slice(1) : lines;
+      const parsed = dataLines.map((line, index) => {
+        const [name = "Friend", email = "", city = ""] = line.split(",").map((part) => part.trim());
+        return { id: `csv-${Date.now()}-${index}`, name, email, city: city || "—", status: "Subscribed" as const, engagement: "Reader" as const, lastSeen: "Just imported" };
+      }).filter((person) => person.email.includes("@"));
+      if (!parsed.length) return toast.error("No valid email addresses found in that CSV");
+      try {
+        const response = await fetch("/api/subscribers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contacts: parsed.map((person) => { const [firstName, ...rest] = person.name.split(" "); return { email: person.email, firstName, lastName: rest.join(" "), city: person.city, language: "en", tags: ["CSV import"] }; }) }) });
+        const data = await response.json() as any; if (!response.ok) throw new Error(data.error || "Import failed");
+        setSubscribers((current) => [...parsed, ...current]); toast.success(`${data.imported} subscriber${data.imported === 1 ? "" : "s"} imported to the local database`);
+      } catch (error) { toast.error(error instanceof Error ? error.message : "Import failed"); }
+    };
+    reader.readAsText(file);
+  };
+
+  const exportSubscribers = () => {
+    const rows = ["name,email,city,status", ...subscribers.map((s) => `${s.name},${s.email},${s.city},${s.status}`)];
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    link.download = "sahaja-subscribers.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success("Subscriber list exported");
+  };
+
+  const viewTitle = navItems.find((item) => item.id === activeView)?.label ?? "Dashboard";
+
+  if (access !== "ready") return <AccessScreen state={access} />;
+
+  return (
+    <div className="min-h-screen bg-transparent text-[#17213f]">
+      <Toaster position="bottom-right" richColors />
+      <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
+
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-[#e4e8f1] bg-white transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <Brand />
+        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 pb-5 scrollbar-thin">
+          <p className="px-3 pb-2 pt-1 text-[12px] font-bold uppercase tracking-[.12em] text-[#8b95ac]">Workspace</p>
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = activeView === item.id;
+              return (
+                <button key={item.id} onClick={() => changeView(item.id)} className={`focus-ring flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-semibold transition ${active ? "bg-[#155bd7] text-white shadow-[0_7px_18px_rgba(21,91,215,.2)]" : "text-[#4e5b78] hover:bg-[#f0f4fb] hover:text-[#1f315d]"}`}>
+                  <Icon className="size-[18px]" strokeWidth={active ? 2.3 : 1.9} />
+                  {item.label}
+                  {item.id === "rsvps" && <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] ${active ? "bg-white/18" : "bg-[#eaf0fd] text-[#155bd7]"}`}>281</span>}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+        <div className="m-3 overflow-hidden rounded-2xl bg-gradient-to-br from-[#17275e] to-[#175cdf] p-4 text-white">
+          <div className="flex items-center justify-between">
+            <Sparkles className="size-5 text-[#ffc46b]" />
+            <Badge className="border border-white/20 bg-white/10 text-white">Studio</Badge>
+          </div>
+          <p className="mt-4 font-serif text-[20px] leading-tight">Self-realization is our birthright.</p>
+          <p className="mt-2 text-[12px] leading-relaxed text-white/70">Create, send, and learn from every invitation.</p>
+        </div>
+      </aside>
+
+      {mobileNavOpen && <button aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-40 bg-[#11182d]/35 md:hidden" />}
+
+      <div className="md:pl-[272px]">
+        <header className="sticky top-0 z-30 flex min-h-[74px] items-center gap-3 border-b border-[#e5e9f1] bg-white/90 px-4 backdrop-blur-xl md:px-7">
+          <Button aria-label="Open navigation" variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)} className="md:hidden"><Menu /></Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12px] font-bold uppercase tracking-[.1em] text-[#8b95ac]">Newsletter studio</p>
+            <h1 className="truncate text-[18px] font-bold tracking-[-.02em] md:text-[21px]">{viewTitle}</h1>
+          </div>
+          <Badge variant="outline" className={`hidden px-3 py-1 md:inline-flex ${backendStatus?.provider?.connected ? "border-[#bce3cf] bg-[#eaf8f0] text-[#177c51]" : "border-[#f0d6ac] bg-[#fff8eb] text-[#9b5d18]"}`}>{backendStatus?.provider?.connected ? `${backendStatus.provider.name || "Sender"} · connected` : "Sender · setup required"}</Badge>
+          <Button variant="outline" className="hidden border-[#dfe4ef] bg-white md:flex"><Calendar className="size-4" /> 12 Aug – 10 Sep <ChevronDown className="size-3.5" /></Button>
+          <Button variant="outline" size="icon" className="relative border-[#dfe4ef]"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-2 rounded-full border-2 border-white bg-[#e04855]" /></Button>
+          <button className="focus-ring flex size-9 items-center justify-center rounded-full bg-[#e9effd] text-sm font-bold text-[#2458b7]" aria-label="Open profile">NN</button>
+        </header>
+
+        <main className="mx-auto max-w-[1540px] p-4 md:p-7">
+          {activeView === "dashboard" && <Dashboard events={events} changeView={changeView} openNewsletter={() => { localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
+          {activeView === "editor" && <EditorView />}
+          {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
+          {activeView === "events" && <EventsView events={events} openEvent={() => setEventOpen(true)} />}
+          {activeView === "meditation" && <MeditationView />}
+          {activeView === "content" && <ContentView />}
+          {activeView === "subscribers" && <SubscribersView subscribers={subscribers} importCsv={() => csvInput.current?.click()} exportCsv={exportSubscribers} />}
+          {activeView === "rsvps" && <RsvpView />}
+          {activeView === "automations" && <AutomationsView values={automations} update={(key, checked) => setAutomations((old) => ({ ...old, [key]: checked }))} />}
+          {activeView === "analytics" && <AnalyticsView />}
+          {activeView === "reports" && <ReportsView />}
+          {activeView === "settings" && <SettingsView />}
+        </main>
+      </div>
+
+      <NewsletterDialog open={newsletterOpen} onOpenChange={setNewsletterOpen} onCreate={addNewsletter} />
+      <EventDialog open={eventOpen} onOpenChange={setEventOpen} onCreate={addEvent} />
+      <NewsletterPreview newsletter={previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)} />
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="flex h-[94px] items-center px-4"><BrandLogo /></div>
+  );
+}
+
+function BrandLogo({ compact = false }: { compact?: boolean }) {
+  return <div className={`relative shrink-0 overflow-hidden bg-white ${compact ? "h-[64px] w-[156px]" : "h-[72px] w-[184px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[1111px]" : "w-[1280px]"}`} /></div>;
+}
+
+function AccessScreen({ state }: { state: "loading" | "signed-out" | "forbidden" | "error" }) {
+  if (state === "loading") return <main className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-[#17213f]"><div className="text-center"><div className="mx-auto size-10 animate-pulse rounded-2xl bg-[#175cdf]"/><p className="mt-4 text-sm font-semibold text-[#6f7a91]">Opening Newsletter Studio…</p></div></main>;
+  return <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#eaf1ff,#f7f8fb_48%)] p-6 text-[#17213f]"><div className="w-full max-w-md rounded-3xl border border-[#e0e5ef] bg-white p-8 text-center shadow-[0_24px_80px_rgba(28,43,79,.14)]"><div className="mx-auto w-fit"><BrandLogo compact /></div><h1 className="mt-5 font-serif text-3xl font-semibold">Organiser studio</h1><p className="mt-3 text-sm leading-6 text-[#6d7890]">{state === "signed-out" ? "Sign in as a Sahaja Yoga event organiser to create newsletters, manage subscribers, and view private engagement analytics." : state === "forbidden" ? "This account does not have organiser access." : "The studio is temporarily unavailable. Please try again shortly."}</p>{state === "signed-out" ? <a href="/signin-with-chatgpt?return_to=/" target="_top" className="focus-ring mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#175cdf] px-5 text-sm font-bold text-white">Organiser sign in</a> : <Button className="mt-6" onClick={() => window.location.reload()}>Try again</Button>}<p className="mt-6 text-xs text-[#8d96a9]">The dashboard and editor are for authorised event organisers only.</p></div></main>;
+}
+
+function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string; title: string; description: string; actions?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div><p className="text-[12px] font-bold uppercase tracking-[.13em] text-[#77839e]">{eyebrow}</p><h2 className="mt-1 font-serif text-[32px] font-semibold tracking-[-.035em] text-[#17213f] md:text-[38px]">{title}</h2><p className="mt-2 max-w-2xl text-[15px] leading-6 text-[#68738d]">{description}</p></div>
+      {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <section className={`rounded-2xl border border-[#e2e6ef] bg-white shadow-[0_10px_32px_rgba(35,48,84,.045)] ${className}`}>{children}</section>;
+}
+
+function PanelTitle({ title, caption, action }: { title: string; caption?: string; action?: ReactNode }) {
+  return <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5"><div><h3 className="text-[15px] font-bold text-[#1d294a]">{title}</h3>{caption && <p className="mt-1 text-[12px] text-[#8490aa]">{caption}</p>}</div>{action}</div>;
+}
+
+function Dashboard({ events, changeView, openNewsletter }: { events: EventItem[]; changeView: (view: ViewId) => void; openNewsletter: () => void }) {
+  const [live, setLive] = useState<any>(null);
+  useEffect(() => { fetch("/api/analytics").then((response) => response.json()).then((data: any) => { if (!data.error) setLive(data); }).catch(() => undefined); }, []);
+  const provider = live?.provider;
+  const ownEvents = Object.fromEntries((live?.events || []).map((item: any) => [item.eventType, Number(item.uniquePeople || item.total || 0)]));
+  const sent = Number(provider?.emails_sent || live?.campaign?.recipientCount || 0);
+  const delivered = Number(provider?.delivered || 0);
+  const opened = Number(provider?.opens?.unique_opens || ownEvents.open || 0);
+  const clicked = Number(provider?.clicks?.unique_clicks || ownEvents.click || 0);
+  const confirmed = Number(live?.rsvps?.confirmed || ownEvents.rsvp || 0);
+  const totalRsvps = Number(live?.rsvps?.total || ownEvents.rsvp || 0);
+  const stats = [
+    { label: "Sent", value: sent.toLocaleString(), note: live?.campaign?.status || "No campaign yet", icon: Send, color: "#2f73e7" },
+    { label: "Delivered", value: delivered.toLocaleString(), note: sent ? `${((delivered / sent) * 100).toFixed(1)}%` : "—", icon: MailCheck, color: "#3867d6" },
+    { label: "Opened", value: opened.toLocaleString(), note: sent ? `${((opened / sent) * 100).toFixed(1)}% unique` : "—", icon: Eye, color: "#8055c9" },
+    { label: "Clicked", value: clicked.toLocaleString(), note: sent ? `${((clicked / sent) * 100).toFixed(1)}% unique` : "—", icon: MousePointerClick, color: "#16a1ae" },
+    { label: "Confirmed", value: confirmed.toLocaleString(), note: "Attributed RSVPs", icon: UserCheck, color: "#1aaa68", featured: true },
+    { label: "RSVPs", value: totalRsvps.toLocaleString(), note: "All responses", icon: CheckCircle2, color: "#1f8ca6" },
+    { label: "Awaiting", value: Math.max(0, sent - totalRsvps).toLocaleString(), note: "No RSVP yet", icon: Clock3, color: "#ea8b29" },
+  ];
+
+  return (
+    <>
+      <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-[.13em] text-[#7c88a2]">Thursday, 10 September</p>
+          <h2 className="mt-1 font-serif text-[32px] font-semibold tracking-[-.035em] text-[#17213f] md:text-[40px]">Jai Shri Mataji, Nischal!</h2>
+          <p className="mt-1 text-[15px] text-[#6e7892]">Welcome to Sahaja Yoga Newsletter Studio.</p>
+        </div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => changeView("subscribers")}><Upload /> Import CSV</Button><Button onClick={openNewsletter} className="bg-[#155bd7] shadow-[0_8px_20px_rgba(21,91,215,.2)] hover:bg-[#104fbf]"><Plus /> Create newsletter</Button></div>
+      </div>
+
+      <Panel className="mb-5 overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-[#e6e9f0] bg-gradient-to-r from-[#fbfcff] to-[#f1f6ff] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3"><span className="text-[12px] font-bold uppercase tracking-[.1em] text-[#7f89a0]">Current campaign</span><span className="font-semibold text-[#1b294e]">{live?.campaign?.title || "No newsletter sent yet"}</span><Badge className="bg-[#e8f8ef] text-[#168656]">{live?.campaign?.status || "Ready"}</Badge></div>
+          <button onClick={() => changeView("analytics")} className="focus-ring flex items-center gap-1 text-sm font-semibold text-[#155bd7]">Open analytics <ArrowRight className="size-4" /></button>
+        </div>
+        <div className="grid gap-px bg-[#e7eaf1] sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return <div key={stat.label} className={`${stat.featured ? "bg-gradient-to-br from-[#1bb475] to-[#139a61] text-white" : "bg-white"} min-h-[138px] p-4`}><div className="flex items-center justify-between"><span className={`flex size-9 items-center justify-center rounded-xl ${stat.featured ? "bg-white/18" : "bg-[#f1f5fc]"}`}><Icon className="size-[18px]" style={{ color: stat.featured ? "white" : stat.color }} /></span>{stat.featured && <Sparkles className="size-4 text-white/70" />}</div><p className={`mt-3 text-[12px] font-semibold ${stat.featured ? "text-white/75" : "text-[#71809b]"}`}>{stat.label}</p><p className="mt-0.5 text-[27px] font-bold tracking-[-.03em]">{stat.value}</p><p className={`mt-1 text-[11px] font-semibold ${stat.featured ? "text-white/80" : "text-[#1b9f65]"}`}>{stat.note}</p></div>;
+          })}
+        </div>
+      </Panel>
+
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="space-y-5">
+          <div className="grid gap-5 xl:grid-cols-[.8fr_1.2fr_1fr]">
+            <Panel>
+              <PanelTitle title="Engagement funnel" caption="From inbox to attendance" />
+              <div className="space-y-2 px-5 pb-5">
+                {[
+                  ["Sent", 1200, "100%", "#36a970"], ["Delivered", 1152, "96%", "#2e6ddb"],
+                  ["Opened", 640, "55.6%", "#7755bd"], ["Clicked", 370, "32.1%", "#f08c31"],
+                  ["RSVPs", 281, "24.4%", "#24a5b7"], ["Confirmed", 243, "20.3%", "#1a9e65"],
+                ].map(([label, value, percent], index) => <div key={String(label)} className="grid grid-cols-[86px_1fr_46px] items-center gap-2 text-[12px]"><span className="text-[#6f7a93]">{label}</span><div className="h-7 overflow-hidden rounded-lg bg-[#f0f3f8]"><div className="flex h-full items-center rounded-lg px-2 text-[11px] font-bold text-white" style={{ width: `${100 - index * 11}%`, background: String(["#36a970", "#2e6ddb", "#7755bd", "#f08c31", "#24a5b7", "#1a9e65"][index]) }}>{Number(value).toLocaleString()}</div></div><span className="text-right font-semibold text-[#37415d]">{percent}</span></div>)}
+              </div>
+            </Panel>
+
+            <Panel>
+              <PanelTitle title="RSVP momentum" caption="Cumulative responses · last 30 days" action={<Badge className="bg-[#e7f7ef] text-[#168656]">243 confirmed</Badge>} />
+              <div className="h-[245px] px-2 pb-3">
+                <ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ left: -15, right: 12, top: 8 }}><CartesianGrid vertical={false} stroke="#e9edf4" /><XAxis dataKey="day" tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><YAxis tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><ChartTooltip contentStyle={chartTooltipStyle} /><Line type="monotone" dataKey="rsvps" stroke="#1aa568" strokeWidth={3} dot={{ r: 3, fill: "#1aa568", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer>
+              </div>
+            </Panel>
+
+            <Panel>
+              <PanelTitle title="Subscriber engagement" caption="1,200 people" />
+              <div className="grid grid-cols-[145px_1fr] items-center gap-2 px-3 pb-5">
+                <div className="h-[170px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={engagementData} dataKey="value" nameKey="name" innerRadius={42} outerRadius={66} paddingAngle={2}>{engagementData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><ChartTooltip contentStyle={chartTooltipStyle} /></PieChart></ResponsiveContainer></div>
+                <div className="space-y-2">{engagementData.map((item) => <div key={item.name} className="flex items-center gap-2 text-[11px]"><span className="size-2.5 rounded-full" style={{ background: item.color }} /><span className="min-w-0 flex-1 text-[#66728c]">{item.name}</span><b>{item.value}</b></div>)}</div>
+              </div>
+            </Panel>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]">
+            <Panel>
+              <PanelTitle title="Audience growth" caption="New people are discovering the collective" action={<button onClick={() => changeView("subscribers")} className="text-[12px] font-bold text-[#155bd7]">View subscribers</button>} />
+              <div className="h-[225px] px-2 pb-3"><ResponsiveContainer width="100%" height="100%"><AreaChart data={growthData} margin={{ left: -15, right: 12, top: 8 }}><defs><linearGradient id="totalFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1aa568" stopOpacity={0.24} /><stop offset="100%" stopColor="#1aa568" stopOpacity={0.01} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e9edf4" /><XAxis dataKey="month" tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><YAxis tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><ChartTooltip contentStyle={chartTooltipStyle} /><Area type="monotone" dataKey="total" stroke="#1aa568" strokeWidth={2.5} fill="url(#totalFill)" /></AreaChart></ResponsiveContainer></div>
+            </Panel>
+            <Panel>
+              <PanelTitle title="Top links" caption="What people cared about" />
+              <div className="space-y-4 px-5 pb-5">{[["Event details", 542, 100], ["Reserve a seat", 398, 74], ["Guided meditation", 176, 45], ["Find a centre", 98, 31]].map(([label, clicks, width]) => <div key={String(label)}><div className="mb-1.5 flex justify-between text-[12px]"><span className="font-semibold text-[#3e4a67]">{label}</span><span className="text-[#7e89a1]">{clicks} clicks</span></div><div className="h-2 rounded-full bg-[#edf1f7]"><div className="h-2 rounded-full bg-gradient-to-r from-[#175cdf] to-[#57a0f0]" style={{ width: `${width}%` }} /></div></div>)}</div>
+            </Panel>
+          </div>
+
+          <Panel>
+            <PanelTitle title="Recent campaigns" caption="Performance across the last five newsletters" action={<button onClick={() => changeView("newsletters")} className="flex items-center gap-1 text-[12px] font-bold text-[#155bd7]">View all <ArrowRight className="size-3.5" /></button>} />
+            <Table><TableHeader><TableRow><TableHead className="pl-5">Campaign</TableHead><TableHead>Sent</TableHead><TableHead>Open rate</TableHead><TableHead>Click rate</TableHead><TableHead>RSVPs</TableHead><TableHead className="pr-5 text-right">Performance</TableHead></TableRow></TableHeader><TableBody>{initialNewsletters.filter((item) => item.status === "Sent").map((item) => <TableRow key={item.id}><TableCell className="pl-5 font-semibold text-[#263354]">{item.title}</TableCell><TableCell>{item.sent.toLocaleString()}</TableCell><TableCell>{item.openRate}%</TableCell><TableCell>{item.clickRate}%</TableCell><TableCell>{item.rsvps}</TableCell><TableCell className="pr-5 text-right"><Badge className="bg-[#e8f8ef] text-[#168656]">Healthy</Badge></TableCell></TableRow>)}</TableBody></Table>
+          </Panel>
+        </div>
+
+        <div className="space-y-5">
+          <Panel>
+            <PanelTitle title="Upcoming events" caption="Next gatherings" action={<button onClick={() => changeView("events")} className="text-[12px] font-bold text-[#155bd7]">View all</button>} />
+            <div className="space-y-2 px-3 pb-3">{events.slice(0, 4).map((event) => <button key={event.id} onClick={() => changeView("events")} className="focus-ring group flex w-full gap-3 rounded-xl p-2 text-left hover:bg-[#f5f7fb]"><img src={event.image} alt="" className="size-14 rounded-xl bg-[#27376b] object-cover" /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-[13px] font-bold leading-5 text-[#263354] group-hover:text-[#155bd7]">{event.title}</p><p className="mt-1 text-[11px] text-[#818ca4]">{event.location} · {event.time}</p></div><div className="w-11 text-center"><span className="block text-[10px] font-bold uppercase text-[#db7b25]">{event.date.split(" ")[0]}</span><span className="block text-lg font-bold text-[#273456]">{event.date.split(" ")[1]}</span></div></button>)}</div>
+          </Panel>
+          <div className="relative min-h-[320px] overflow-hidden rounded-2xl bg-[#152555] text-white shadow-[0_16px_40px_rgba(23,39,84,.18)]"><img src="/images/collective-meditation.jpg" alt="People meditating together in a Sahaja Yoga class" className="absolute inset-0 h-full w-full object-cover opacity-35" /><div className="absolute inset-0 bg-gradient-to-t from-[#101c43] via-[#142653]/70 to-transparent" /><div className="relative flex min-h-[320px] flex-col justify-end p-5"><Badge className="mb-3 bg-white/15 text-white backdrop-blur">From We Meditate</Badge><p className="font-serif text-[27px] leading-[1.05]">Meditation becomes deeper when it is shared.</p><p className="mt-3 text-[13px] leading-5 text-white/72">Free collective sessions are led by volunteer practitioners in cities around the world.</p><a href="https://wemeditate.com/classes" target="_blank" rel="noreferrer" className="focus-ring mt-4 flex items-center gap-2 self-start rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#17275c]">Find a class <ExternalLink className="size-4" /></a></div></div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function NewslettersView({ newsletters, openComposer, preview }: { newsletters: Newsletter[]; openComposer: (id?: string) => void; preview: (item: Newsletter) => void }) {
+  const [filter, setFilter] = useState("All");
+  const [stored, setStored] = useState<Array<Newsletter & { backendId?: string }>>([]);
+  useEffect(() => { fetch("/api/campaigns").then((response) => response.json()).then((data: any) => { if (Array.isArray(data.campaigns)) setStored(data.campaigns.map((item: any) => ({ id: item.id, backendId: item.id, title: item.title, subject: item.subject, status: item.status === "draft" ? "Draft" : item.status === "scheduled" ? "Scheduled" : "Sent", date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "", sent: item.recipientCount || 0, openRate: 0, clickRate: 0, rsvps: 0 }))); }).catch(() => undefined); }, []);
+  const allNewsletters = stored.length ? stored : newsletters;
+  const visible = allNewsletters.filter((item) => filter === "All" || item.status === filter);
+  return (
+    <>
+      <PageHeading eyebrow="Campaigns" title="Newsletters" description="Create beautiful updates, invite your friends, and understand what brings the community together." actions={<Button onClick={() => openComposer()}><Plus /> New newsletter</Button>} />
+      <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#e2e6ef] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={filter} onValueChange={setFilter}><TabsList>{["All", "Sent", "Scheduled", "Draft"].map((item) => <TabsTrigger key={item} value={item}>{item}</TabsTrigger>)}</TabsList></Tabs>
+        <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-2.5 size-4 text-[#8a94aa]" /><Input placeholder="Search campaigns" className="pl-9" /></div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          {visible.map((item) => <Panel key={item.id} className="overflow-hidden transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(35,48,84,.09)]"><div className={`h-1.5 ${item.status === "Sent" ? "bg-[#1aaa68]" : item.status === "Scheduled" ? "bg-[#175cdf]" : "bg-[#e3a145]"}`} /><div className="p-5"><div className="flex items-start justify-between gap-3"><Badge className={item.status === "Sent" ? "bg-[#e7f7ef] text-[#168656]" : item.status === "Scheduled" ? "bg-[#eaf0ff] text-[#175cdf]" : "bg-[#fff5e6] text-[#a66318]"}>{item.status}</Badge><Button variant="ghost" size="icon-sm"><MoreHorizontal /></Button></div><h3 className="mt-4 font-serif text-[24px] font-semibold leading-tight text-[#19254a]">{item.title}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-[#737f98]">{item.subject}</p><div className="mt-5 grid grid-cols-3 gap-2 rounded-xl bg-[#f6f8fb] p-3 text-center"><MiniMetric label="Sent" value={String(item.sent)} /><MiniMetric label="Open" value={`${item.openRate}%`} /><MiniMetric label="RSVP" value={String(item.rsvps)} /></div><div className="mt-4 flex items-center justify-between"><span className="text-[12px] text-[#8993a9]">{item.date}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => preview(item)}><Eye /> Preview</Button>{(item as any).backendId && <Button size="sm" onClick={() => openComposer((item as any).backendId)}>Edit</Button>}</div></div></div></Panel>)}
+      </div>
+    </>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-[#8b95aa]">{label}</p><p className="mt-1 text-base font-bold text-[#253254]">{value}</p></div>;
+}
+
+function EventsView({ events, openEvent }: { events: EventItem[]; openEvent: () => void }) {
+  return (
+    <>
+      <PageHeading eyebrow="Gatherings" title="Events" description="Keep local and online events in one calendar, then turn each gathering into a ready-to-send invitation." actions={<><Button variant="outline" onClick={() => toast.success("Calendar view copied") }><Copy /> Copy calendar</Button><Button onClick={openEvent}><Plus /> Add event</Button></>} />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-4 md:grid-cols-2">{events.map((event) => <Panel key={event.id} className="overflow-hidden"><div className="relative h-44 overflow-hidden bg-[#1b2f68]"><img src={event.image} alt="" className="h-full w-full object-cover opacity-80 transition duration-500 hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-[#162451]/75 to-transparent" /><Badge className="absolute left-4 top-4 bg-white/90 text-[#23345f] backdrop-blur">{event.format}</Badge><div className="absolute bottom-4 left-4 rounded-xl bg-white px-3 py-2 text-center shadow-lg"><span className="block text-[10px] font-bold uppercase text-[#d66f2a]">{event.date.split(" ")[0]}</span><span className="block text-xl font-bold text-[#1c2a4d]">{event.date.split(" ")[1]}</span></div></div><div className="p-5"><h3 className="font-serif text-[23px] font-semibold text-[#1b274a]">{event.title}</h3><div className="mt-3 space-y-2 text-sm text-[#6f7a93]"><p className="flex items-center gap-2"><Clock3 className="size-4 text-[#175cdf]" />{event.time}</p><p className="flex items-center gap-2"><MapPin className="size-4 text-[#175cdf]" />{event.location}</p></div><div className="mt-5"><div className="mb-2 flex justify-between text-[12px]"><span className="font-semibold">{event.rsvps} attending</span><span className="text-[#8993a8]">{event.capacity} places</span></div><Progress value={(event.rsvps / event.capacity) * 100} className="h-2" /></div><div className="mt-5 flex gap-2"><Button variant="outline" className="flex-1" onClick={() => toast.success("Invitation copied to a new draft")}><Mail /> Invite</Button><Button className="flex-1" onClick={() => toast.success("RSVP list opened")}>Manage</Button></div></div></Panel>)}</div>
+        <Panel className="h-fit p-5 lg:sticky lg:top-24"><div className="flex items-center justify-between"><h3 className="font-serif text-[25px] font-semibold">September 2026</h3><CalendarDays className="size-5 text-[#175cdf]" /></div><div className="mt-5 grid grid-cols-7 gap-1 text-center text-[12px]"><>{["M","T","W","T","F","S","S"].map((d, i) => <span key={`${d}-${i}`} className="pb-2 font-bold text-[#8b94a9]">{d}</span>)}</>{Array.from({ length: 35 }, (_, i) => { const day = i - 1; const highlighted = [14,18,26].includes(day); return <button key={i} className={`aspect-square rounded-lg text-[13px] ${day < 1 || day > 30 ? "text-transparent" : highlighted ? "bg-[#175cdf] font-bold text-white" : day === 10 ? "border border-[#e4ad67] bg-[#fff8ed] font-bold text-[#9b5e1f]" : "hover:bg-[#f0f3f8]"}`}>{day > 0 && day <= 30 ? day : "·"}</button>; })}</div><div className="mt-6 rounded-xl bg-[#f1f5ff] p-4"><p className="text-[12px] font-bold uppercase tracking-wide text-[#6880b9]">Planning note</p><p className="mt-2 text-sm leading-6 text-[#455471]">The next invitation is scheduled for Sunday, one day before the Ulm weekly meditation.</p></div></Panel>
+      </div>
+    </>
+  );
+}
+
+function MeditationView() {
+  const [running, setRunning] = useState(false);
+  const [minutes, setMinutes] = useState(10);
+  return (
+    <>
+      <PageHeading eyebrow="Practice" title="Weekly meditation" description="A calm, reusable session plan for facilitators—before, during, and after the collective." actions={<Button onClick={() => setRunning((value) => !value)}>{running ? <><X /> End session</> : <><Zap /> Start facilitator mode</>}</Button>} />
+      <div className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
+        <div className="relative min-h-[480px] overflow-hidden rounded-3xl bg-[#17275d] text-white"><img src="/images/collective-meditation.jpg" alt="A collective Sahaja Yoga meditation class" className="absolute inset-0 h-full w-full object-cover opacity-30" /><div className="absolute inset-0 bg-gradient-to-tr from-[#111d46] via-[#17275d]/90 to-[#2e5ca3]/55" /><div className="relative flex min-h-[480px] flex-col justify-between p-6 md:p-9"><div><Badge className="border border-white/20 bg-white/10 text-white">Monday · 18:00–20:00 · Ulm</Badge><h2 className="mt-5 max-w-xl font-serif text-[42px] font-semibold leading-[1.02] md:text-[58px]">Arrive. Settle. Let the silence do the rest.</h2><p className="mt-5 max-w-lg text-[15px] leading-7 text-white/72">A gentle two-hour arc for welcoming newcomers and deepening the collective experience.</p></div><div className="grid gap-3 sm:grid-cols-4">{[["18:00","Welcome"],["18:15","Introduction"],["18:35",`${minutes}-min meditation`],["19:10","Questions & tea"]].map(([time,label], index) => <button key={time} onClick={() => index === 2 && setMinutes(minutes === 10 ? 15 : 10)} className={`focus-ring rounded-2xl p-4 text-left backdrop-blur ${running && index === 2 ? "bg-[#f0a94b] text-[#382006]" : "bg-white/10"}`}><span className="text-[11px] font-bold uppercase tracking-wide opacity-65">{time}</span><span className="mt-2 block text-sm font-bold">{label}</span></button>)}</div></div></div>
+        <div className="space-y-5"><Panel className="p-5"><h3 className="font-serif text-[25px] font-semibold">Facilitator checklist</h3><div className="mt-4 space-y-3">{["Prepare a clean, quiet space", "Welcome newcomers without pressure", "Keep the introduction simple", "Allow time for the experience", "Share free follow-up resources"].map((item, index) => <label key={item} className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#e5e9f1] p-3 hover:bg-[#f8f9fc]"><input type="checkbox" defaultChecked={index < 2} className="mt-0.5 size-4 accent-[#175cdf]" /><span className="text-sm font-medium text-[#46536f]">{item}</span></label>)}</div></Panel><Panel className="p-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-[#fff1dd] text-[#c56f1d]"><MessageCircle className="size-5" /></div><div><h3 className="font-bold">Newcomer follow-up</h3><p className="text-[12px] text-[#7e899f]">Send the morning after the session</p></div></div><Textarea className="mt-4 min-h-28" defaultValue="Thank you for joining us yesterday. If you would like to continue, here is a free ten-minute guided meditation and details of next Monday's session." /><Button className="mt-3 w-full" variant="outline" onClick={() => toast.success("Follow-up saved as a template")}><Check /> Save template</Button></Panel></div>
+      </div>
+    </>
+  );
+}
+
+function ContentView() {
+  const [query, setQuery] = useState("");
+  const visible = sources.filter((item) => `${item.title} ${item.description} ${item.source}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <>
+      <PageHeading eyebrow="Trusted material" title="Content library" description="Share concise introductions and free practices drawn from official Sahaja Yoga and We Meditate resources." actions={<Button variant="outline" onClick={() => toast.success("Your saved templates are up to date")}><RefreshCw /> Refresh</Button>} />
+      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-[#e2e6ef] bg-white p-3"><Search className="ml-1 size-5 text-[#8791a6]" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search meditations, articles, or class resources" className="border-0 shadow-none focus-visible:ring-0" /><Button variant="outline"><SlidersHorizontal /> Filter</Button></div>
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visible.map((item, index) => <Panel key={item.title} className={`overflow-hidden ${index === 0 ? "md:col-span-2 xl:col-span-1" : ""}`}><div className="relative h-48 overflow-hidden bg-[#182b66]"><img src={item.image} alt="" className={`h-full w-full ${item.image.includes("lotus-water") ? "object-contain p-12" : "object-cover"}`} /><Badge className="absolute left-4 top-4 bg-white/90 text-[#263454]">{item.kind}</Badge></div><div className="p-5"><p className="text-[11px] font-bold uppercase tracking-[.11em] text-[#db7d2b]">{item.source}</p><h3 className="mt-2 font-serif text-[25px] font-semibold leading-tight">{item.title}</h3><p className="mt-3 min-h-[72px] text-sm leading-6 text-[#6f7a92]">{item.description}</p><div className="mt-4 flex gap-2"><Button className="flex-1" variant="outline" onClick={() => toast.success("Added to the current newsletter draft")}><Plus /> Add to draft</Button><Button size="icon" asChild><a href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.title}`}><ExternalLink /></a></Button></div></div></Panel>)}</div>
+      <Panel className="mt-5 flex flex-col items-start gap-4 p-5 md:flex-row md:items-center"><div className="flex size-11 items-center justify-center rounded-xl bg-[#edf3ff] text-[#175cdf]"><BookOpen className="size-5" /></div><div className="flex-1"><h3 className="font-bold">Approved organiser sources</h3><p className="mt-1 text-sm leading-6 text-[#6d7992]">Use only approved international Sahaja Yoga material and images your team is authorised to distribute.</p></div><Button variant="outline" asChild><a href="https://shrimataji.org/" target="_blank" rel="noreferrer">Official archive <ExternalLink /></a></Button></Panel>
+    </>
+  );
+}
+
+function SubscribersView({ subscribers, importCsv, exportCsv }: { subscribers: Subscriber[]; importCsv: () => void; exportCsv: () => void }) {
+  const [query, setQuery] = useState("");
+  const [segment, setSegment] = useState("All");
+  const filtered = subscribers.filter((person) => (segment === "All" || person.engagement === segment) && `${person.name} ${person.email} ${person.city}`.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <>
+      <PageHeading eyebrow="Community" title="Subscribers" description="Keep a respectful, clear record of who has chosen to receive updates." actions={<><Button variant="outline" onClick={exportCsv}><Download /> Export CSV</Button><Button onClick={importCsv}><Upload /> Import CSV</Button></>} />
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{([["Total subscribers", subscribers.length + 1194, "+342 this year", Users, "#175cdf"],["Active", "1,024", "85.3% of total", Activity, "#1aa568"],["New this month", "182", "+12.4%", UserPlus, "#8055c9"],["Unsubscribed", "74", "6.2%", Mail, "#d9636e"]] as Array<[string, string | number, string, LucideIcon, string]>).map(([label,value,note,Icon,color]) => <Panel key={label} className="p-5"><div className="flex items-center justify-between"><span className="text-[12px] font-bold uppercase tracking-wide text-[#7c879f]">{label}</span><Icon className="size-5" style={{ color }} /></div><p className="mt-3 text-[30px] font-bold tracking-[-.03em]">{String(value)}</p><p className="mt-1 text-[12px] font-semibold text-[#1b9d65]">{note}</p></Panel>)}</div>
+      <Panel className="overflow-hidden"><div className="flex flex-col gap-3 border-b border-[#e5e8ef] p-4 sm:flex-row sm:items-center sm:justify-between"><div className="relative w-full sm:max-w-sm"><Search className="absolute left-3 top-2.5 size-4 text-[#8791a6]" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or city" className="pl-9" /></div><Select value={segment} onValueChange={setSegment}><SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger><SelectContent>{["All","High","Interested","Reader","Low"].map((item) => <SelectItem key={item} value={item}>{item === "All" ? "All segments" : item}</SelectItem>)}</SelectContent></Select></div><Table><TableHeader><TableRow><TableHead className="pl-5">Subscriber</TableHead><TableHead>City</TableHead><TableHead>Engagement</TableHead><TableHead>Last activity</TableHead><TableHead className="pr-5 text-right">Status</TableHead></TableRow></TableHeader><TableBody>{filtered.map((person) => <TableRow key={person.id}><TableCell className="pl-5"><div className="flex items-center gap-3"><div className="flex size-9 items-center justify-center rounded-full bg-[#edf2ff] text-[12px] font-bold text-[#2458b7]">{person.name.split(" ").map((part) => part[0]).slice(0,2).join("")}</div><div><p className="font-semibold text-[#283552]">{person.name}</p><p className="text-[12px] text-[#8791a6]">{person.email}</p></div></div></TableCell><TableCell>{person.city}</TableCell><TableCell><Badge variant="secondary" className={person.engagement === "High" ? "bg-[#e7f7ef] text-[#168656]" : person.engagement === "Low" ? "bg-[#fff4e5] text-[#9a611f]" : "bg-[#edf2ff] text-[#285ab8]"}>{person.engagement}</Badge></TableCell><TableCell className="text-[#768198]">{person.lastSeen}</TableCell><TableCell className="pr-5 text-right"><span className={person.status === "Subscribed" ? "text-[#178758]" : "text-[#a06168]"}>{person.status}</span></TableCell></TableRow>)}</TableBody></Table></Panel>
+    </>
+  );
+}
+
+function RsvpView() {
+  const people = [
+    ["Anna Keller","Weekly meditation · Ulm","Yes","2 guests"], ["Rahul Mehta","Meditate together online","Yes","Just me"],
+    ["Jonas Weber","Music & meditation evening","Maybe","Just me"], ["Maria Rossi","Weekly meditation · Ulm","Yes","1 guest"],
+    ["Sofia Marin","Music & meditation evening","Awaiting","—"],
+  ];
+  return (
+    <>
+      <PageHeading eyebrow="Responses" title="RSVPs" description="See who is coming, who needs a gentle reminder, and whether an event is close to capacity." actions={<Button variant="outline" onClick={() => toast.success("Reminder draft created for 38 people")}><Bell /> Draft reminder</Button>} />
+      <div className="mb-5 grid gap-4 md:grid-cols-4">{[["Total RSVPs","281","+12 today"],["Confirmed","243","86.5%"],["Maybe","38","13.5%"],["Expected guests","249","Across 3 events"]].map(([label,value,note], index) => <Panel key={label} className={`p-5 ${index === 1 ? "bg-gradient-to-br from-[#1caf70] to-[#15955d] text-white" : ""}`}><p className={`text-[12px] font-bold uppercase tracking-wide ${index === 1 ? "text-white/70" : "text-[#7c879e]"}`}>{label}</p><p className="mt-2 text-[31px] font-bold">{value}</p><p className={`mt-1 text-[12px] ${index === 1 ? "text-white/78" : "text-[#7a859b]"}`}>{note}</p></Panel>)}</div>
+      <Panel className="overflow-hidden"><PanelTitle title="Latest responses" caption="Demo responses received during the current campaign" action={<Button variant="outline" size="sm"><ArrowDownToLine /> Download</Button>} /><Table><TableHeader><TableRow><TableHead className="pl-5">Name</TableHead><TableHead>Event</TableHead><TableHead>Response</TableHead><TableHead className="pr-5 text-right">Party</TableHead></TableRow></TableHeader><TableBody>{people.map(([name,event,response,party]) => <TableRow key={name}><TableCell className="pl-5 font-semibold">{name}</TableCell><TableCell>{event}</TableCell><TableCell><Badge className={response === "Yes" ? "bg-[#e6f7ed] text-[#168656]" : response === "Maybe" ? "bg-[#fff3df] text-[#9b611a]" : "bg-[#f0f2f6] text-[#707b90]"}>{response}</Badge></TableCell><TableCell className="pr-5 text-right text-[#707b91]">{party}</TableCell></TableRow>)}</TableBody></Table></Panel>
+    </>
+  );
+}
+
+function AutomationsView({ values, update }: { values: Record<AutomationKey, boolean>; update: (key: AutomationKey, checked: boolean) => void }) {
+  const flows: { key: AutomationKey; title: string; description: string; timing: string; icon: typeof Zap }[] = [
+    { key: "welcome", title: "Warm welcome", description: "Send a short welcome and a first guided meditation to new subscribers.", timing: "Immediately after signup", icon: Sparkles },
+    { key: "eventReminder", title: "Event reminder", description: "Remind confirmed guests with time, location, and a simple preparation note.", timing: "24 hours before an event", icon: Bell },
+    { key: "weekly", title: "Weekly meditation", description: "Share the next collective session with the active community segment.", timing: "Every Sunday at 18:00", icon: CalendarDays },
+    { key: "followup", title: "Gentle follow-up", description: "Send one kind follow-up to friends who opened but did not respond.", timing: "3 days after invitation", icon: MessageCircle },
+  ];
+  return (
+    <>
+      <PageHeading eyebrow="Careful consistency" title="Automations" description="Handle recurring communication without losing the warmth of a personal invitation." actions={<Button variant="outline" onClick={() => toast.success("Automation activity refreshed")}><RefreshCw /> Refresh activity</Button>} />
+      <div className="grid gap-4 xl:grid-cols-2">{flows.map((flow) => { const Icon = flow.icon; return <Panel key={flow.key} className="p-5"><div className="flex items-start gap-4"><div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${values[flow.key] ? "bg-[#e8f8ef] text-[#178759]" : "bg-[#f0f2f6] text-[#7d879b]"}`}><Icon className="size-5" /></div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><h3 className="font-serif text-[23px] font-semibold">{flow.title}</h3><Switch checked={values[flow.key]} onCheckedChange={(checked) => { update(flow.key, checked); toast.success(`${flow.title} ${checked ? "enabled" : "paused"}`); }} /></div><p className="mt-2 text-sm leading-6 text-[#6e7992]">{flow.description}</p><div className="mt-4 flex items-center gap-2 rounded-xl bg-[#f6f8fb] px-3 py-2 text-[12px] font-semibold text-[#63708c]"><Clock3 className="size-4 text-[#175cdf]" />{flow.timing}</div></div></div></Panel>; })}</div>
+      <Panel className="mt-5 overflow-hidden"><PanelTitle title="Recent automation activity" caption="No messages are actually sent in this demo" /><div className="divide-y divide-[#e8ebf2]">{[["Event reminder","74 contacts prepared","Today, 09:02"],["Warm welcome","6 new subscribers","Yesterday, 17:14"],["Weekly meditation","1,024 contacts prepared","Sunday, 18:00"]].map(([title,note,time]) => <div key={title} className="flex items-center gap-4 px-5 py-4"><span className="flex size-9 items-center justify-center rounded-full bg-[#e8f8ef] text-[#178759]"><Check className="size-4" /></span><div className="flex-1"><p className="text-sm font-bold">{title}</p><p className="text-[12px] text-[#7c879e]">{note}</p></div><span className="text-[12px] text-[#8a94a8]">{time}</span></div>)}</div></Panel>
+    </>
+  );
+}
+
+function AnalyticsView() {
+  return (
+    <>
+      <PageHeading eyebrow="Signals, not vanity" title="Analytics" description="See which invitations help people take the next meaningful step—from reading to joining." actions={<Button variant="outline"><Calendar /> Last 6 months <ChevronDown /></Button>} />
+      <div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
+        <Panel><PanelTitle title="Audience growth" caption="Total and active subscribers" /><div className="h-[340px] px-3 pb-4"><ResponsiveContainer width="100%" height="100%"><AreaChart data={growthData} margin={{ left: -5, right: 15, top: 10 }}><defs><linearGradient id="audienceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#175cdf" stopOpacity={.25}/><stop offset="100%" stopColor="#175cdf" stopOpacity={.01}/></linearGradient></defs><CartesianGrid vertical={false} stroke="#e9edf4"/><XAxis dataKey="month" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><ChartTooltip contentStyle={chartTooltipStyle}/><Area type="monotone" dataKey="total" stroke="#175cdf" fill="url(#audienceFill)" strokeWidth={3}/><Line type="monotone" dataKey="active" stroke="#1aa568" strokeWidth={2}/></AreaChart></ResponsiveContainer></div></Panel>
+        <Panel><PanelTitle title="Healthy benchmarks" caption="Current campaign" /><div className="space-y-5 px-5 pb-5">{[["Delivery rate",96,95],["Open rate",55.6,42],["Click rate",32.1,18],["RSVP conversion",24.4,15]].map(([label,value,benchmark]) => <div key={String(label)}><div className="mb-2 flex justify-between text-sm"><span className="font-semibold">{label}</span><span className="font-bold text-[#168656]">{value}%</span></div><Progress value={Number(value)} /><p className="mt-1.5 text-[11px] text-[#8791a6]">Reference line: {benchmark}%</p></div>)}</div></Panel>
+      </div>
+      <div className="mt-5 grid gap-5 lg:grid-cols-2"><Panel><PanelTitle title="Clicks by day" caption="Where attention peaks" /><div className="h-64 px-3 pb-4"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{d:"Mon",v:38},{d:"Tue",v:55},{d:"Wed",v:81},{d:"Thu",v:64},{d:"Fri",v:49},{d:"Sat",v:37},{d:"Sun",v:71}]}><CartesianGrid vertical={false} stroke="#e9edf4"/><XAxis dataKey="d" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><ChartTooltip contentStyle={chartTooltipStyle}/><Bar dataKey="v" fill="#175cdf" radius={[8,8,0,0]}/></BarChart></ResponsiveContainer></div></Panel><Panel className="p-6"><p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#db7b28]">Plain-language insight</p><h3 className="mt-3 font-serif text-[30px] font-semibold leading-tight">Your community responds to concrete invitations.</h3><p className="mt-4 text-sm leading-7 text-[#69758f]">Event details and reservation links receive 2.8× more clicks than general information. Lead with the gathering, then offer one short meditation resource.</p><div className="mt-6 rounded-2xl bg-[#edf3ff] p-4"><p className="text-sm font-bold text-[#2458b7]">Suggested next test</p><p className="mt-1 text-[13px] leading-6 text-[#5e6d8b]">Try one clear RSVP button above the first paragraph in the next invitation.</p></div></Panel></div>
+    </>
+  );
+}
+
+function ReportsView() {
+  const reports = [["Monthly community pulse","Audience, engagement, and RSVP trends","PDF · Sep 2026"],["Campaign performance","Five most recent newsletters","CSV · Sep 2026"],["Event attendance","Registrations and expected guests","CSV · Sep 2026"],["Consent & subscription log","Signup and unsubscribe status","CSV · Sep 2026"]];
+  return <><PageHeading eyebrow="Shareable summaries" title="Reports" description="Turn the important numbers into simple updates for organizers and volunteers." actions={<Button onClick={() => toast.success("Report bundle prepared in demo mode")}><FileBarChart /> Create report</Button>} /><div className="grid gap-4 md:grid-cols-2">{reports.map(([title,description,meta], index) => <Panel key={title} className="p-5"><div className="flex items-start gap-4"><div className={`flex size-12 items-center justify-center rounded-xl ${index === 0 ? "bg-[#e8f8ef] text-[#168656]" : "bg-[#edf2ff] text-[#175cdf]"}`}><FileText className="size-5" /></div><div className="flex-1"><h3 className="font-serif text-[22px] font-semibold">{title}</h3><p className="mt-1 text-sm text-[#6f7b94]">{description}</p><p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-[#929bad]">{meta}</p></div><Button variant="outline" size="icon" onClick={() => toast.success(`${title} downloaded`)}><Download /></Button></div></Panel>)}</div></>;
+}
+
+function SettingsView() {
+  const [provider, setProvider] = useState<{ connected?: boolean; listName?: string; memberCount?: number; error?: string } | null>(null);
+  const [runtime, setRuntime] = useState<"desktop" | "web">("web");
+  const [delivery, setDelivery] = useState({ apiToken: "", hasApiToken: false, senderGroupId: "", fromName: "Sahaja Yoga Newsletter", replyTo: "", workspace: "" });
+  const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/status").then((response) => response.json()).then(async (data: any) => {
+      setProvider(data.provider || null);
+      if (data.runtime === "desktop") {
+        setRuntime("desktop");
+        const response = await fetch("/api/local/settings");
+        const settings = await response.json() as any;
+        if (response.ok) setDelivery((current) => ({ ...current, ...settings, apiToken: "" }));
+      }
+    }).catch(() => undefined);
+  }, []);
+
+  const saveSender = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/local/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(delivery) });
+      const data = await response.json() as any;
+      if (!response.ok) throw new Error(data.error || "Could not save Sender settings");
+      setProvider(data.provider || null);
+      setDelivery((current) => ({ ...current, apiToken: "", hasApiToken: current.hasApiToken || Boolean(current.apiToken) }));
+      toast.success(data.provider?.connected ? "Sender connected securely" : "Settings saved—check the token and group ID");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save Sender settings"); }
+    finally { setSaving(false); }
+  };
+
+  const syncSender = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch("/api/subscribers/sync-sender", { method: "POST" });
+      const data = await response.json() as any;
+      if (!response.ok) throw new Error(data.error || "Sync failed");
+      toast.success(`${data.synced} contacts synchronized${data.failed ? ` · ${data.failed} need attention` : ""}`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Sync failed"); }
+    finally { setSyncing(false); }
+  };
+
+  return (
+    <>
+      <PageHeading eyebrow="Workspace" title="Settings" description="Connect free Sender delivery, protect organiser credentials, and control the local workspace." />
+      <div className="grid gap-5 xl:grid-cols-[1fr_.7fr]">
+        <div className="space-y-5">
+          <Panel className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div><h3 className="font-serif text-[25px] font-semibold">Sender delivery</h3><p className="mt-1 text-sm text-[#6f7a91]">Free campaign sending with automatic unsubscribe and engagement reporting.</p></div>
+              <Badge className={provider?.connected ? "bg-[#e7f7ef] text-[#168656]" : "bg-[#fff3df] text-[#9b611a]"}>{provider?.connected ? "Connected" : runtime === "desktop" ? "Setup required" : "Desktop only"}</Badge>
+            </div>
+            {runtime === "desktop" ? <>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2"><Label htmlFor="sender-token">API access token</Label><Input id="sender-token" type="password" className="mt-2" value={delivery.apiToken} onChange={(event) => setDelivery((current) => ({ ...current, apiToken: event.target.value }))} placeholder={delivery.hasApiToken ? "Saved securely · enter only to replace" : "Paste token from Sender settings"} /></div>
+                <div><Label htmlFor="sender-group">Subscriber group ID</Label><Input id="sender-group" className="mt-2" value={delivery.senderGroupId} onChange={(event) => setDelivery((current) => ({ ...current, senderGroupId: event.target.value }))} placeholder="e.g. elxJK6" /></div>
+                <div><Label htmlFor="sender-from">From name</Label><Input id="sender-from" className="mt-2" value={delivery.fromName} onChange={(event) => setDelivery((current) => ({ ...current, fromName: event.target.value }))} /></div>
+                <div className="sm:col-span-2"><Label htmlFor="sender-reply">Verified sender / reply-to email</Label><Input id="sender-reply" type="email" className="mt-2" value={delivery.replyTo} onChange={(event) => setDelivery((current) => ({ ...current, replyTo: event.target.value }))} placeholder="newsletter@your-domain.org" /></div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button onClick={saveSender} disabled={saving}><Check />{saving ? "Checking connection…" : "Save & test connection"}</Button>
+                <Button variant="outline" onClick={syncSender} disabled={!provider?.connected || syncing}><RefreshCw />{syncing ? "Synchronizing slowly…" : "Sync local subscribers"}</Button>
+              </div>
+              {provider?.connected && <div className="mt-5 rounded-2xl bg-[#edf8f2] p-4"><p className="font-bold text-[#176d49]">{provider.listName}</p><p className="mt-1 text-sm text-[#4f7665]">{provider.memberCount?.toLocaleString()} active contacts · free allowance up to 2,500 contacts and 15,000 emails/month</p></div>}
+              <p className="mt-4 rounded-xl bg-[#f1f5ff] p-3 text-[12px] leading-5 text-[#536587]">Contact sync is intentionally limited to one API request at a time with automatic backoff. A 2,000-contact sync may take 10–30 minutes. Campaign delivery is queued by Sender and may continue after this app is closed.</p>
+            </> : <div className="mt-5 rounded-2xl bg-[#eef3ff] p-4 text-sm leading-6 text-[#4f6082]"><p className="font-bold text-[#2458b7]">The web version is a visual preview</p><p className="mt-1">Sender credentials and real subscriber data are entered only in the installed Windows app. No API token is stored in this hosted preview.</p></div>}
+          </Panel>
+          <Panel className="p-5">
+            <h3 className="font-serif text-[25px] font-semibold">Local project workspace</h3>
+            <p className="mt-2 text-sm leading-6 text-[#6f7a91]">The Windows app automatically creates Database, Media, Projects, Exports, and Backups folders inside Documents.</p>
+            {runtime === "desktop" && <><div className="mt-4 break-all rounded-xl bg-[#f6f8fb] p-3 font-mono text-xs text-[#56627b]">{delivery.workspace}</div><Button className="mt-4" variant="outline" onClick={() => fetch("/api/local/open-folder", { method: "POST" })}><Settings /> Open workspace folder</Button></>}
+          </Panel>
+          <Panel className="p-5"><h3 className="font-serif text-[25px] font-semibold">Privacy & consent</h3><div className="mt-4 space-y-4">{[["Consent required","Import only contacts who agreed to receive the newsletter"],["Automatic unsubscribe","Sender places a working opt-out link in every campaign"],["Respectful analytics","Use opens and clicks for aggregate planning, not intrusive profiling"]].map(([title,description]) => <div key={title} className="flex items-start gap-4 rounded-xl border border-[#e5e9f1] p-4"><Switch defaultChecked /><div><p className="text-sm font-bold">{title}</p><p className="mt-1 text-[12px] leading-5 text-[#77829a]">{description}</p></div></div>)}</div></Panel>
+        </div>
+        <div className="space-y-5">
+          <Panel className="p-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-[#fff1dd] text-[#c36b1a]"><ImageIcon className="size-5" /></div><div><h3 className="font-bold">Approved content sources</h3><p className="text-[12px] text-[#7e899f]">International and official archive material only</p></div></div><div className="mt-5 space-y-4"><SourceLink label="We Meditate" href="https://wemeditate.com/" /><SourceLink label="Shri Mataji — official archive" href="https://shrimataji.org/" /></div><p className="mt-5 rounded-xl bg-[#fff8eb] p-3 text-[12px] leading-5 text-[#765122]">Keep the official logo and orange Shakti Yantra unchanged, and confirm image permission before publishing.</p></Panel>
+          <Panel className="p-5"><Badge className="bg-[#eaf0ff] text-[#175cdf]">Organiser-only workspace</Badge><h3 className="mt-4 font-serif text-[27px] font-semibold">Private studio. Public recipient actions.</h3><p className="mt-3 text-sm leading-6 text-[#6d7891]">Only authorised Sahaja Yoga event organisers can enter the dashboard and editor. Attendees and subscribers interact only with newsletters, unsubscribe preferences, and RSVP links.</p></Panel>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SourceLink({ label, href }: { label: string; href: string }) {
+  return <a href={href} target="_blank" rel="noreferrer" className="focus-ring flex items-center justify-between rounded-xl border border-[#e5e9f1] px-4 py-3 text-sm font-semibold text-[#34415f] hover:border-[#b9c9eb] hover:bg-[#f7f9fe]"><span>{label}</span><ExternalLink className="size-4 text-[#175cdf]" /></a>;
+}
+
+function NewsletterDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (item: Newsletter) => void }) {
+  const [title, setTitle] = useState("A moment of silence, together");
+  const [subject, setSubject] = useState("Join our next free collective meditation");
+  const [content, setContent] = useState("Dear friends,\n\nWe warmly invite you to pause, turn your attention within, and enjoy a collective meditation with us. Everyone is welcome, and the session is always free.");
+  const [status, setStatus] = useState<"Draft" | "Scheduled">("Draft");
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    onCreate({ id: `n-${Date.now()}`, title: title.trim(), subject: subject.trim(), status, date: status === "Scheduled" ? "13 Sep 2026" : "Just now", sent: 0, openRate: 0, clickRate: 0, rsvps: 0 });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Create a newsletter</DialogTitle><DialogDescription>Start with a warm invitation. In this demo, saving creates a browser-local draft.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="newsletter-title">Campaign title</Label><Input id="newsletter-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div><Label htmlFor="newsletter-status">Save as</Label><Select value={status} onValueChange={(value) => setStatus(value as "Draft" | "Scheduled")}><SelectTrigger id="newsletter-status" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Draft">Draft</SelectItem><SelectItem value="Scheduled">Scheduled for Sunday</SelectItem></SelectContent></Select></div></div><div><Label htmlFor="newsletter-subject">Email subject</Label><Input id="newsletter-subject" className="mt-2" value={subject} onChange={(e) => setSubject(e.target.value)} required /></div><div><Label htmlFor="newsletter-body">Message</Label><Textarea id="newsletter-body" className="mt-2 min-h-44 leading-6" value={content} onChange={(e) => setContent(e.target.value)} /></div><div className="rounded-2xl border border-[#e0e6f1] bg-[#f7f9fd] p-4"><p className="text-[12px] font-bold uppercase tracking-wide text-[#74809a]">Suggested building blocks</p><div className="mt-3 flex flex-wrap gap-2">{["Event details","RSVP button","10-minute meditation","Directions","Contact"].map((block) => <Button key={block} type="button" variant="outline" size="sm" onClick={() => { setContent((old) => `${old}\n\n${block}: Add details here.`); toast.success(`${block} added`); }}><Plus />{block}</Button>)}</div></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={!title.trim() || !subject.trim()}><Check /> Save {status.toLowerCase()}</Button></DialogFooter></form></DialogContent></Dialog>
+  );
+}
+
+function EventDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (item: EventItem) => void }) {
+  const [title, setTitle] = useState("Collective meditation");
+  const [date, setDate] = useState("21 Sep");
+  const [time, setTime] = useState("18:00–20:00");
+  const [location, setLocation] = useState("Ulm");
+  const [format, setFormat] = useState<EventItem["format"]>("In person");
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    onCreate({ id: `e-${Date.now()}`, title, date, time, location, format, rsvps: 0, capacity: 30, image: "/images/collective-meditation.jpg" });
+  };
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Add an event</DialogTitle><DialogDescription>Create an event card that can be inserted into a newsletter.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label htmlFor="event-title">Event title</Label><Input id="event-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="event-date">Date</Label><Input id="event-date" className="mt-2" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div><Label htmlFor="event-time">Time</Label><Input id="event-time" className="mt-2" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div><div><Label htmlFor="event-location">Location or meeting link</Label><Input id="event-location" className="mt-2" value={location} onChange={(e) => setLocation(e.target.value)} required /></div><div><Label htmlFor="event-format">Format</Label><Select value={format} onValueChange={(value) => setFormat(value as EventItem["format"])}><SelectTrigger id="event-format" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="In person">In person</SelectItem><SelectItem value="Online">Online</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit"><Plus /> Add event</Button></DialogFooter></form></DialogContent></Dialog>;
+}
+
+function NewsletterPreview({ newsletter, onOpenChange }: { newsletter: Newsletter | null; onOpenChange: (open: boolean) => void }) {
+  return <Dialog open={Boolean(newsletter)} onOpenChange={onOpenChange}><DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl"><DialogHeader className="sr-only"><DialogTitle>Newsletter preview</DialogTitle><DialogDescription>Preview of the selected newsletter</DialogDescription></DialogHeader>{newsletter && <div className="bg-[#edf0f5] p-4 sm:p-8"><div className="mx-auto max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(26,38,70,.16)]"><div className="relative h-56 bg-[#18285e]"><img src="/images/collective-meditation.jpg" alt="People sharing a collective meditation" className="h-full w-full object-cover opacity-60" /><div className="absolute inset-0 bg-gradient-to-t from-[#17275f] via-transparent to-transparent" /><div className="absolute bottom-5 left-6 right-6"><p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#ffd08c]">Sahaja Yoga · Friends newsletter</p><h2 className="mt-2 font-serif text-[34px] font-semibold leading-none text-white">{newsletter.title}</h2></div></div><div className="p-6 sm:p-8"><p className="font-serif text-[21px] text-[#233154]">Dear friends,</p><p className="mt-4 text-sm leading-7 text-[#66738f]">We warmly invite you to pause, turn your attention within, and enjoy a collective meditation with us. Everyone is welcome, and the session is always free.</p><div className="my-6 rounded-2xl bg-[#f1f5ff] p-5"><p className="text-[11px] font-bold uppercase tracking-wide text-[#6f83ba]">Next gathering</p><p className="mt-2 font-serif text-[23px] font-semibold">Weekly meditation · Ulm</p><p className="mt-2 text-sm text-[#62708d]">Monday, 14 September · 18:00–20:00</p></div><Button className="w-full bg-[#175cdf]">Reserve a place</Button><p className="mt-6 text-center text-[11px] leading-5 text-[#939caf]">You are receiving this sample because this is a demonstration workspace. No email has been sent.</p></div></div></div>}</DialogContent></Dialog>;
+}

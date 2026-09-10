@@ -1,0 +1,6 @@
+import { apiError, getDatabase, json, requireAdminApi } from "@/lib/server";
+
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminApi(); if (auth.response) return auth.response;
+  try { const { id } = await context.params; const db = getDatabase(); const campaign = await db.prepare("SELECT provider_campaign_id AS providerCampaignId,status,recipient_count AS recipientCount FROM campaigns WHERE id=?").bind(id).first<{ providerCampaignId: string | null; status: string; recipientCount: number }>(); if (!campaign) return json({ error: "Newsletter not found" }, { status: 404 }); const events = await db.prepare("SELECT event_type AS eventType,COUNT(*) AS total,COUNT(DISTINCT subscriber_id) AS uniquePeople FROM tracking_events WHERE campaign_id=? GROUP BY event_type").bind(id).all(); const links = await db.prepare("SELECT l.id,l.label,l.destination_url AS destinationUrl,COUNT(t.id) AS clicks,COUNT(DISTINCT t.subscriber_id) AS uniqueClicks FROM campaign_links l LEFT JOIN tracking_events t ON t.link_id=l.id AND t.event_type='click' WHERE l.campaign_id=? GROUP BY l.id ORDER BY uniqueClicks DESC").bind(id).all(); return json({ campaign, events: events.results, links: links.results, provider: null, runtime: "web-preview" }); } catch (error) { return apiError(error); }
+}
