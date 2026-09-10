@@ -1,8 +1,11 @@
 # Sahaja Yoga Newsletter Studio
 
+> **September 2026 update:** The home dashboard now restores the reference’s audience, engagement, link/content performance and campaign-history sections using saved records. Four source-informed templates, story/gallery editing, shared HTML preview, personalised greetings, notifications and reporting periods are described in [Newsletter design and dashboard integration](docs/newsletter-design.md). That document also identifies remaining delivery and legacy-screen limitations.
+
+
 An organiser-only newsletter, event communication, RSVP, and engagement workspace for Sahaja Yoga teams.
 
-The application gives a small group of experienced organisers a polished desktop workspace for preparing image-rich HTML newsletters, maintaining a subscriber list, sending through [Sender](https://www.sender.net/), and reviewing opens, clicks, bounces, unsubscribes, and RSVP-oriented link activity. Operational data stays on the organiser's Windows computer; the web edition is a protected visual preview and does not hold Sender credentials.
+The application gives a small group of experienced organisers a polished desktop workspace for preparing image-rich HTML newsletters, maintaining a subscriber list, sending through [Sender](https://www.sender.net/), and reviewing opens, clicks, bounces, unsubscribes, and RSVP-oriented link activity. Desktop operational data stays on the organiser's Windows computer; the web edition is a protected visual preview and does not hold Sender credentials.
 
 > [!IMPORTANT]
 > This is an administration tool for authorised Sahaja Yoga event organisers. It is not a public class finder, meditation guide, attendee portal, or subscriber-facing application.
@@ -11,6 +14,7 @@ The application gives a small group of experienced organisers a polished desktop
 
 ## Table of contents
 
+- [Newsletter design and dashboard integration](docs/newsletter-design.md)
 - [Project status](#project-status)
 - [Why this exists](#why-this-exists)
 - [Product principles](#product-principles)
@@ -42,7 +46,7 @@ The application gives a small group of experienced organisers a polished desktop
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Organiser dashboard | Implemented | Responsive campaign, audience, event, RSVP, analytics, and report views |
+| Organiser dashboard | Implemented | Saved campaign, audience, engagement, link/content performance, history and event sections; some older secondary screens remain demonstrations |
 | Newsletter editor | Implemented | Block editing, desktop/mobile preview, image studio, HTML generation |
 | Windows local backend | Implemented | Loopback-only HTTP API, SQLite, media store, project exports, backups |
 | Sender integration | Implemented | Connection test, subscriber sync, test send, schedule, campaign send, analytics |
@@ -84,7 +88,7 @@ The master draft is based on the practical structure used by organisers such as 
 | Workspace | Capabilities |
 | --- | --- |
 | Dashboard | Campaign health, subscriber totals, RSVP trends, engagement segments, recent newsletters |
-| Newsletter editor | Master template, blocks, inline editing, image studio, email settings, responsive preview |
+| Newsletter editor | Four templates, previous-edition copies, stories/galleries, image studio, email settings, responsive preview |
 | Newsletters | Draft, scheduled, and sent campaign catalogue with performance summaries |
 | Events | Event cards, date/time/location details, invitations, capacity, RSVP progress |
 | Weekly meditation | Session structure and organiser planning surface |
@@ -162,6 +166,8 @@ The editor is the centre of the system. On wide screens it uses three columns: c
 
 | Block | Typical use | Editable properties |
 | --- | --- | --- |
+| Story | Connected event report and image | Date/place, title, paragraphs, left/right/above/below photo, caption, album or booking button |
+| Gallery | Event photographs and album | Up to three independently editable photos, alt text, captions, album link |
 | Hero | Newsletter identity and lead story | Eyebrow, title, text, image |
 | Heading | Section titles | Text, size, alignment, colour |
 | Text | Reports, invitations, schedules, closing | Copy, alignment, colour |
@@ -187,7 +193,7 @@ The image workflow addresses the common pain points of composing newsletters in 
 - Set displayed width, surrounding padding, corner radius, and alignment.
 - Export a new email-ready copy while preserving the original.
 
-Edited local images are written to the application's media store and referenced by the draft. When a Sender campaign is prepared, local asset references are resolved into campaign-safe HTML.
+Edited local images are written to the application's media store and referenced by the draft. Export the edited PNG to the organisation’s approved public media hosting and replace the draft’s image URL before sending. The app blocks localhost and base64 images during desktop delivery; automatic provider media uploading is not implemented.
 
 ### Master newsletter structure
 
@@ -556,7 +562,7 @@ This repository is software documentation, not legal advice.
 - The Free Forever tier historically allows one account seat; the five organisers may need to share an agreed operational Windows account/process or move to a suitable plan.
 - Open tracking is inherently approximate because mail privacy features, image blocking, and automated scanners can create false positives or negatives.
 - A click on an RSVP link does not prove registration completion.
-- Data-URI support for embedded local images varies across email clients. For important campaigns, use stable public HTTPS image hosting approved by the organisation and test the target clients.
+- Desktop delivery rejects local/base64 images. Use stable public HTTPS image hosting approved by the organisation and test the target inboxes.
 - The desktop database is local to each installation. Five independent installations do not automatically merge their drafts or subscriber changes.
 - The current executable is unsigned, so Windows may show a SmartScreen warning.
 - Building the NSIS installer outside Windows requires a compatible Wine environment; the x64 ZIP is the currently verified portable distribution.

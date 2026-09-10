@@ -1,6 +1,8 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
 
+import { DashboardView } from "./dashboard-view";
+import { WorkspaceControls } from "./workspace-controls";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -45,6 +47,7 @@ import {
 import type {
   AutomationKey, EventItem, Newsletter, Subscriber, ViewId,
 } from "./data";
+import { renderDocument } from "@/lib/newsletter-renderer.mjs";
 import { EditorView } from "./editor-view";
 
 declare global {
@@ -105,6 +108,13 @@ export default function Home() {
     { welcome: true, eventReminder: true, weekly: true, followup: false },
   );
   const csvInput = useRef<HTMLInputElement>(null);
+  const [editorKey,setEditorKey]=useState(0);
+  const [workspace,setWorkspace]=useState<any>(null);
+  const [workspaceError,setWorkspaceError]=useState("");
+  const refreshWorkspace=async()=>{const r=await fetch("/api/workspace");const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not load workspace");setWorkspace(d);setWorkspaceError("");};
+  const updateWorkspace=async(patch:any)=>{const r=await fetch("/api/workspace",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not save preferences");setWorkspace(d);};
+  useEffect(()=>{if(access!=="ready")return;const refresh=()=>{void fetch("/api/events").then(r=>r.json()).then((d:any)=>{if(Array.isArray(d.events))setEvents(d.events.map((e:any)=>({...e,date:new Date(e.startsAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}),time:new Date(e.startsAt).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}),format:"In person",image:"/images/collective-meditation.jpg",rsvps:0})));}).catch(()=>undefined);void refreshWorkspace().catch(e=>setWorkspaceError(e.message));};refresh();window.addEventListener("studio:changed",refresh);window.addEventListener("focus",refresh);return()=>{window.removeEventListener("studio:changed",refresh);window.removeEventListener("focus",refresh);};},[access]);
+
 
   useEffect(() => {
     fetch("/api/status").then(async (response) => {
@@ -154,7 +164,9 @@ export default function Home() {
     return () => lifecycle.abort();
   }, [events, setNewsletters]);
 
-  const changeView = (view: ViewId) => {
+  const changeView = async (view: ViewId) => {
+    try{if(activeView==="editor")await (window as any).sySaveDraft?.();}catch(e){toast.error(e instanceof Error?e.message:"Save your draft before leaving");return;}
+    if(view==="editor")setEditorKey(k=>k+1);
     setActiveView(view);
     setMobileNavOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -166,10 +178,8 @@ export default function Home() {
     toast.success("Newsletter draft created");
   };
 
-  const addEvent = (item: EventItem) => {
-    setEvents((current) => [item, ...current]);
-    setEventOpen(false);
-    toast.success("Event added to the calendar");
+  const addEvent = async (item: EventItem & {startsAt?:string}) => {
+    try{const r=await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...item,startsAt:item.startsAt})});const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not save event");setEvents(current=>[{...item,id:d.event.id},...current]);setEventOpen(false);window.dispatchEvent(new Event("studio:changed"));toast.success("Event saved to your workspace");}catch(e){toast.error(e instanceof Error?e.message:"Could not save event");}
   };
 
   const importSubscribers = (file?: File) => {
@@ -186,7 +196,7 @@ export default function Home() {
       try {
         const response = await fetch("/api/subscribers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contacts: parsed.map((person) => { const [firstName, ...rest] = person.name.split(" "); return { email: person.email, firstName, lastName: rest.join(" "), city: person.city, language: "en", tags: ["CSV import"] }; }) }) });
         const data = await response.json() as any; if (!response.ok) throw new Error(data.error || "Import failed");
-        setSubscribers((current) => [...parsed, ...current]); toast.success(`${data.imported} subscriber${data.imported === 1 ? "" : "s"} imported to the local database`);
+        setSubscribers((current) => [...parsed, ...current]); window.dispatchEvent(new Event("studio:changed")); toast.success(`${data.imported} subscriber${data.imported === 1 ? "" : "s"} imported to the local database`);
       } catch (error) { toast.error(error instanceof Error ? error.message : "Import failed"); }
     };
     reader.readAsText(file);
@@ -249,14 +259,13 @@ export default function Home() {
             <h1 className="truncate text-[18px] font-bold tracking-[-.02em] md:text-[21px]">{viewTitle}</h1>
           </div>
           <Badge variant="outline" className={`hidden px-3 py-1 md:inline-flex ${backendStatus?.provider?.connected ? "border-[#bce3cf] bg-[#eaf8f0] text-[#177c51]" : "border-[#f0d6ac] bg-[#fff8eb] text-[#9b5d18]"}`}>{backendStatus?.provider?.connected ? `${backendStatus.provider.name || "Sender"} · connected` : "Sender · setup required"}</Badge>
-          <Button variant="outline" className="hidden border-[#dfe4ef] bg-white md:flex"><Calendar className="size-4" /> 12 Aug – 10 Sep <ChevronDown className="size-3.5" /></Button>
-          <Button variant="outline" size="icon" className="relative border-[#dfe4ef]"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-2 rounded-full border-2 border-white bg-[#e04855]" /></Button>
-          <button className="focus-ring flex size-9 items-center justify-center rounded-full bg-[#e9effd] text-sm font-bold text-[#2458b7]" aria-label="Open profile">NN</button>
+          <WorkspaceControls workspace={workspace} update={updateWorkspace} open={id=>{localStorage.setItem("sy-edit-campaign",id);changeView("editor");}} events={()=>changeView("events")}/>
+
         </header>
 
         <main className="mx-auto max-w-[1540px] p-4 md:p-7">
-          {activeView === "dashboard" && <Dashboard events={events} changeView={changeView} openNewsletter={() => { localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
-          {activeView === "editor" && <EditorView />}
+          {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
+          {activeView === "editor" && <EditorView key={editorKey} />}
           {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
           {activeView === "events" && <EventsView events={events} openEvent={() => setEventOpen(true)} />}
           {activeView === "meditation" && <MeditationView />}
@@ -279,12 +288,12 @@ export default function Home() {
 
 function Brand() {
   return (
-    <div className="flex h-[94px] items-center px-4"><BrandLogo /></div>
+    <div className="flex h-[66px] items-center px-4"><BrandLogo /></div>
   );
 }
 
 function BrandLogo({ compact = false }: { compact?: boolean }) {
-  return <div className={`relative shrink-0 overflow-hidden bg-white ${compact ? "h-[64px] w-[156px]" : "h-[72px] w-[184px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[1111px]" : "w-[1280px]"}`} /></div>;
+  return <div className={`relative shrink-0 overflow-hidden bg-white ${compact ? "h-[45px] w-[109px]" : "h-[50.4px] w-[128.8px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[777.7px]" : "w-[896px]"}`} /></div>;
 }
 
 function AccessScreen({ state }: { state: "loading" | "signed-out" | "forbidden" | "error" }) {
@@ -309,122 +318,19 @@ function PanelTitle({ title, caption, action }: { title: string; caption?: strin
   return <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5"><div><h3 className="text-[15px] font-bold text-[#1d294a]">{title}</h3>{caption && <p className="mt-1 text-[12px] text-[#8490aa]">{caption}</p>}</div>{action}</div>;
 }
 
-function Dashboard({ events, changeView, openNewsletter }: { events: EventItem[]; changeView: (view: ViewId) => void; openNewsletter: () => void }) {
-  const [live, setLive] = useState<any>(null);
-  useEffect(() => { fetch("/api/analytics").then((response) => response.json()).then((data: any) => { if (!data.error) setLive(data); }).catch(() => undefined); }, []);
-  const provider = live?.provider;
-  const ownEvents = Object.fromEntries((live?.events || []).map((item: any) => [item.eventType, Number(item.uniquePeople || item.total || 0)]));
-  const sent = Number(provider?.emails_sent || live?.campaign?.recipientCount || 0);
-  const delivered = Number(provider?.delivered || 0);
-  const opened = Number(provider?.opens?.unique_opens || ownEvents.open || 0);
-  const clicked = Number(provider?.clicks?.unique_clicks || ownEvents.click || 0);
-  const confirmed = Number(live?.rsvps?.confirmed || ownEvents.rsvp || 0);
-  const totalRsvps = Number(live?.rsvps?.total || ownEvents.rsvp || 0);
-  const stats = [
-    { label: "Sent", value: sent.toLocaleString(), note: live?.campaign?.status || "No campaign yet", icon: Send, color: "#2f73e7" },
-    { label: "Delivered", value: delivered.toLocaleString(), note: sent ? `${((delivered / sent) * 100).toFixed(1)}%` : "—", icon: MailCheck, color: "#3867d6" },
-    { label: "Opened", value: opened.toLocaleString(), note: sent ? `${((opened / sent) * 100).toFixed(1)}% unique` : "—", icon: Eye, color: "#8055c9" },
-    { label: "Clicked", value: clicked.toLocaleString(), note: sent ? `${((clicked / sent) * 100).toFixed(1)}% unique` : "—", icon: MousePointerClick, color: "#16a1ae" },
-    { label: "Confirmed", value: confirmed.toLocaleString(), note: "Attributed RSVPs", icon: UserCheck, color: "#1aaa68", featured: true },
-    { label: "RSVPs", value: totalRsvps.toLocaleString(), note: "All responses", icon: CheckCircle2, color: "#1f8ca6" },
-    { label: "Awaiting", value: Math.max(0, sent - totalRsvps).toLocaleString(), note: "No RSVP yet", icon: Clock3, color: "#ea8b29" },
-  ];
-
-  return (
-    <>
-      <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
-        <div>
-          <p className="text-[12px] font-bold uppercase tracking-[.13em] text-[#7c88a2]">Thursday, 10 September</p>
-          <h2 className="mt-1 font-serif text-[32px] font-semibold tracking-[-.035em] text-[#17213f] md:text-[40px]">Jai Shri Mataji, Nischal!</h2>
-          <p className="mt-1 text-[15px] text-[#6e7892]">Welcome to Sahaja Yoga Newsletter Studio.</p>
-        </div>
-        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => changeView("subscribers")}><Upload /> Import CSV</Button><Button onClick={openNewsletter} className="bg-[#155bd7] shadow-[0_8px_20px_rgba(21,91,215,.2)] hover:bg-[#104fbf]"><Plus /> Create newsletter</Button></div>
-      </div>
-
-      <Panel className="mb-5 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-[#e6e9f0] bg-gradient-to-r from-[#fbfcff] to-[#f1f6ff] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3"><span className="text-[12px] font-bold uppercase tracking-[.1em] text-[#7f89a0]">Current campaign</span><span className="font-semibold text-[#1b294e]">{live?.campaign?.title || "No newsletter sent yet"}</span><Badge className="bg-[#e8f8ef] text-[#168656]">{live?.campaign?.status || "Ready"}</Badge></div>
-          <button onClick={() => changeView("analytics")} className="focus-ring flex items-center gap-1 text-sm font-semibold text-[#155bd7]">Open analytics <ArrowRight className="size-4" /></button>
-        </div>
-        <div className="grid gap-px bg-[#e7eaf1] sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return <div key={stat.label} className={`${stat.featured ? "bg-gradient-to-br from-[#1bb475] to-[#139a61] text-white" : "bg-white"} min-h-[138px] p-4`}><div className="flex items-center justify-between"><span className={`flex size-9 items-center justify-center rounded-xl ${stat.featured ? "bg-white/18" : "bg-[#f1f5fc]"}`}><Icon className="size-[18px]" style={{ color: stat.featured ? "white" : stat.color }} /></span>{stat.featured && <Sparkles className="size-4 text-white/70" />}</div><p className={`mt-3 text-[12px] font-semibold ${stat.featured ? "text-white/75" : "text-[#71809b]"}`}>{stat.label}</p><p className="mt-0.5 text-[27px] font-bold tracking-[-.03em]">{stat.value}</p><p className={`mt-1 text-[11px] font-semibold ${stat.featured ? "text-white/80" : "text-[#1b9f65]"}`}>{stat.note}</p></div>;
-          })}
-        </div>
-      </Panel>
-
-      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="space-y-5">
-          <div className="grid gap-5 xl:grid-cols-[.8fr_1.2fr_1fr]">
-            <Panel>
-              <PanelTitle title="Engagement funnel" caption="From inbox to attendance" />
-              <div className="space-y-2 px-5 pb-5">
-                {[
-                  ["Sent", 1200, "100%", "#36a970"], ["Delivered", 1152, "96%", "#2e6ddb"],
-                  ["Opened", 640, "55.6%", "#7755bd"], ["Clicked", 370, "32.1%", "#f08c31"],
-                  ["RSVPs", 281, "24.4%", "#24a5b7"], ["Confirmed", 243, "20.3%", "#1a9e65"],
-                ].map(([label, value, percent], index) => <div key={String(label)} className="grid grid-cols-[86px_1fr_46px] items-center gap-2 text-[12px]"><span className="text-[#6f7a93]">{label}</span><div className="h-7 overflow-hidden rounded-lg bg-[#f0f3f8]"><div className="flex h-full items-center rounded-lg px-2 text-[11px] font-bold text-white" style={{ width: `${100 - index * 11}%`, background: String(["#36a970", "#2e6ddb", "#7755bd", "#f08c31", "#24a5b7", "#1a9e65"][index]) }}>{Number(value).toLocaleString()}</div></div><span className="text-right font-semibold text-[#37415d]">{percent}</span></div>)}
-              </div>
-            </Panel>
-
-            <Panel>
-              <PanelTitle title="RSVP momentum" caption="Cumulative responses · last 30 days" action={<Badge className="bg-[#e7f7ef] text-[#168656]">243 confirmed</Badge>} />
-              <div className="h-[245px] px-2 pb-3">
-                <ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ left: -15, right: 12, top: 8 }}><CartesianGrid vertical={false} stroke="#e9edf4" /><XAxis dataKey="day" tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><YAxis tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><ChartTooltip contentStyle={chartTooltipStyle} /><Line type="monotone" dataKey="rsvps" stroke="#1aa568" strokeWidth={3} dot={{ r: 3, fill: "#1aa568", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer>
-              </div>
-            </Panel>
-
-            <Panel>
-              <PanelTitle title="Subscriber engagement" caption="1,200 people" />
-              <div className="grid grid-cols-[145px_1fr] items-center gap-2 px-3 pb-5">
-                <div className="h-[170px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={engagementData} dataKey="value" nameKey="name" innerRadius={42} outerRadius={66} paddingAngle={2}>{engagementData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><ChartTooltip contentStyle={chartTooltipStyle} /></PieChart></ResponsiveContainer></div>
-                <div className="space-y-2">{engagementData.map((item) => <div key={item.name} className="flex items-center gap-2 text-[11px]"><span className="size-2.5 rounded-full" style={{ background: item.color }} /><span className="min-w-0 flex-1 text-[#66728c]">{item.name}</span><b>{item.value}</b></div>)}</div>
-              </div>
-            </Panel>
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]">
-            <Panel>
-              <PanelTitle title="Audience growth" caption="New people are discovering the collective" action={<button onClick={() => changeView("subscribers")} className="text-[12px] font-bold text-[#155bd7]">View subscribers</button>} />
-              <div className="h-[225px] px-2 pb-3"><ResponsiveContainer width="100%" height="100%"><AreaChart data={growthData} margin={{ left: -15, right: 12, top: 8 }}><defs><linearGradient id="totalFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1aa568" stopOpacity={0.24} /><stop offset="100%" stopColor="#1aa568" stopOpacity={0.01} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e9edf4" /><XAxis dataKey="month" tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><YAxis tick={{ fontSize: 11, fill: "#8791a8" }} tickLine={false} axisLine={false} /><ChartTooltip contentStyle={chartTooltipStyle} /><Area type="monotone" dataKey="total" stroke="#1aa568" strokeWidth={2.5} fill="url(#totalFill)" /></AreaChart></ResponsiveContainer></div>
-            </Panel>
-            <Panel>
-              <PanelTitle title="Top links" caption="What people cared about" />
-              <div className="space-y-4 px-5 pb-5">{[["Event details", 542, 100], ["Reserve a seat", 398, 74], ["Guided meditation", 176, 45], ["Find a centre", 98, 31]].map(([label, clicks, width]) => <div key={String(label)}><div className="mb-1.5 flex justify-between text-[12px]"><span className="font-semibold text-[#3e4a67]">{label}</span><span className="text-[#7e89a1]">{clicks} clicks</span></div><div className="h-2 rounded-full bg-[#edf1f7]"><div className="h-2 rounded-full bg-gradient-to-r from-[#175cdf] to-[#57a0f0]" style={{ width: `${width}%` }} /></div></div>)}</div>
-            </Panel>
-          </div>
-
-          <Panel>
-            <PanelTitle title="Recent campaigns" caption="Performance across the last five newsletters" action={<button onClick={() => changeView("newsletters")} className="flex items-center gap-1 text-[12px] font-bold text-[#155bd7]">View all <ArrowRight className="size-3.5" /></button>} />
-            <Table><TableHeader><TableRow><TableHead className="pl-5">Campaign</TableHead><TableHead>Sent</TableHead><TableHead>Open rate</TableHead><TableHead>Click rate</TableHead><TableHead>RSVPs</TableHead><TableHead className="pr-5 text-right">Performance</TableHead></TableRow></TableHeader><TableBody>{initialNewsletters.filter((item) => item.status === "Sent").map((item) => <TableRow key={item.id}><TableCell className="pl-5 font-semibold text-[#263354]">{item.title}</TableCell><TableCell>{item.sent.toLocaleString()}</TableCell><TableCell>{item.openRate}%</TableCell><TableCell>{item.clickRate}%</TableCell><TableCell>{item.rsvps}</TableCell><TableCell className="pr-5 text-right"><Badge className="bg-[#e8f8ef] text-[#168656]">Healthy</Badge></TableCell></TableRow>)}</TableBody></Table>
-          </Panel>
-        </div>
-
-        <div className="space-y-5">
-          <Panel>
-            <PanelTitle title="Upcoming events" caption="Next gatherings" action={<button onClick={() => changeView("events")} className="text-[12px] font-bold text-[#155bd7]">View all</button>} />
-            <div className="space-y-2 px-3 pb-3">{events.slice(0, 4).map((event) => <button key={event.id} onClick={() => changeView("events")} className="focus-ring group flex w-full gap-3 rounded-xl p-2 text-left hover:bg-[#f5f7fb]"><img src={event.image} alt="" className="size-14 rounded-xl bg-[#27376b] object-cover" /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-[13px] font-bold leading-5 text-[#263354] group-hover:text-[#155bd7]">{event.title}</p><p className="mt-1 text-[11px] text-[#818ca4]">{event.location} · {event.time}</p></div><div className="w-11 text-center"><span className="block text-[10px] font-bold uppercase text-[#db7b25]">{event.date.split(" ")[0]}</span><span className="block text-lg font-bold text-[#273456]">{event.date.split(" ")[1]}</span></div></button>)}</div>
-          </Panel>
-          <div className="relative min-h-[320px] overflow-hidden rounded-2xl bg-[#152555] text-white shadow-[0_16px_40px_rgba(23,39,84,.18)]"><img src="/images/collective-meditation.jpg" alt="People meditating together in a Sahaja Yoga class" className="absolute inset-0 h-full w-full object-cover opacity-35" /><div className="absolute inset-0 bg-gradient-to-t from-[#101c43] via-[#142653]/70 to-transparent" /><div className="relative flex min-h-[320px] flex-col justify-end p-5"><Badge className="mb-3 bg-white/15 text-white backdrop-blur">From We Meditate</Badge><p className="font-serif text-[27px] leading-[1.05]">Meditation becomes deeper when it is shared.</p><p className="mt-3 text-[13px] leading-5 text-white/72">Free collective sessions are led by volunteer practitioners in cities around the world.</p><a href="https://wemeditate.com/classes" target="_blank" rel="noreferrer" className="focus-ring mt-4 flex items-center gap-2 self-start rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#17275c]">Find a class <ExternalLink className="size-4" /></a></div></div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 function NewslettersView({ newsletters, openComposer, preview }: { newsletters: Newsletter[]; openComposer: (id?: string) => void; preview: (item: Newsletter) => void }) {
   const [filter, setFilter] = useState("All");
+  const [search,setSearch]=useState("");
   const [stored, setStored] = useState<Array<Newsletter & { backendId?: string }>>([]);
   useEffect(() => { fetch("/api/campaigns").then((response) => response.json()).then((data: any) => { if (Array.isArray(data.campaigns)) setStored(data.campaigns.map((item: any) => ({ id: item.id, backendId: item.id, title: item.title, subject: item.subject, status: item.status === "draft" ? "Draft" : item.status === "scheduled" ? "Scheduled" : "Sent", date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "", sent: item.recipientCount || 0, openRate: 0, clickRate: 0, rsvps: 0 }))); }).catch(() => undefined); }, []);
-  const allNewsletters = stored.length ? stored : newsletters;
-  const visible = allNewsletters.filter((item) => filter === "All" || item.status === filter);
+  const allNewsletters = stored;
+  const visible = allNewsletters.filter((item) => (filter === "All" || item.status === filter)&&`${item.title} ${item.subject}`.toLowerCase().includes(search.toLowerCase()));
   return (
     <>
       <PageHeading eyebrow="Campaigns" title="Newsletters" description="Create beautiful updates, invite your friends, and understand what brings the community together." actions={<Button onClick={() => openComposer()}><Plus /> New newsletter</Button>} />
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#e2e6ef] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs value={filter} onValueChange={setFilter}><TabsList>{["All", "Sent", "Scheduled", "Draft"].map((item) => <TabsTrigger key={item} value={item}>{item}</TabsTrigger>)}</TabsList></Tabs>
-        <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-2.5 size-4 text-[#8a94aa]" /><Input placeholder="Search campaigns" className="pl-9" /></div>
+        <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-2.5 size-4 text-[#8a94aa]" /><Input placeholder="Search campaigns" value={search} onChange={e=>setSearch(e.target.value)} className="pl-9" /></div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {visible.map((item) => <Panel key={item.id} className="overflow-hidden transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(35,48,84,.09)]"><div className={`h-1.5 ${item.status === "Sent" ? "bg-[#1aaa68]" : item.status === "Scheduled" ? "bg-[#175cdf]" : "bg-[#e3a145]"}`} /><div className="p-5"><div className="flex items-start justify-between gap-3"><Badge className={item.status === "Sent" ? "bg-[#e7f7ef] text-[#168656]" : item.status === "Scheduled" ? "bg-[#eaf0ff] text-[#175cdf]" : "bg-[#fff5e6] text-[#a66318]"}>{item.status}</Badge><Button variant="ghost" size="icon-sm"><MoreHorizontal /></Button></div><h3 className="mt-4 font-serif text-[24px] font-semibold leading-tight text-[#19254a]">{item.title}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-[#737f98]">{item.subject}</p><div className="mt-5 grid grid-cols-3 gap-2 rounded-xl bg-[#f6f8fb] p-3 text-center"><MiniMetric label="Sent" value={String(item.sent)} /><MiniMetric label="Open" value={`${item.openRate}%`} /><MiniMetric label="RSVP" value={String(item.rsvps)} /></div><div className="mt-4 flex items-center justify-between"><span className="text-[12px] text-[#8993a9]">{item.date}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => preview(item)}><Eye /> Preview</Button>{(item as any).backendId && <Button size="sm" onClick={() => openComposer((item as any).backendId)}>Edit</Button>}</div></div></div></Panel>)}
@@ -642,19 +548,21 @@ function NewsletterDialog({ open, onOpenChange, onCreate }: { open: boolean; onO
   );
 }
 
-function EventDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (item: EventItem) => void }) {
+function EventDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (item: EventItem & {startsAt?:string}) => void }) {
   const [title, setTitle] = useState("Collective meditation");
-  const [date, setDate] = useState("21 Sep");
-  const [time, setTime] = useState("18:00–20:00");
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+  const [time, setTime] = useState("18:00");
   const [location, setLocation] = useState("Ulm");
   const [format, setFormat] = useState<EventItem["format"]>("In person");
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onCreate({ id: `e-${Date.now()}`, title, date, time, location, format, rsvps: 0, capacity: 30, image: "/images/collective-meditation.jpg" });
+    onCreate({ id: `e-${Date.now()}`, startsAt:new Date(`${date}T${time}`).toISOString(), title, date, time, location, format, rsvps: 0, capacity: 30, image: "/images/collective-meditation.jpg" });
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Add an event</DialogTitle><DialogDescription>Create an event card that can be inserted into a newsletter.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label htmlFor="event-title">Event title</Label><Input id="event-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="event-date">Date</Label><Input id="event-date" className="mt-2" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div><Label htmlFor="event-time">Time</Label><Input id="event-time" className="mt-2" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div><div><Label htmlFor="event-location">Location or meeting link</Label><Input id="event-location" className="mt-2" value={location} onChange={(e) => setLocation(e.target.value)} required /></div><div><Label htmlFor="event-format">Format</Label><Select value={format} onValueChange={(value) => setFormat(value as EventItem["format"])}><SelectTrigger id="event-format" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="In person">In person</SelectItem><SelectItem value="Online">Online</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit"><Plus /> Add event</Button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Add an event</DialogTitle><DialogDescription>Create an event card that can be inserted into a newsletter.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label htmlFor="event-title">Event title</Label><Input id="event-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="event-date">Date</Label><Input type="date" id="event-date" className="mt-2" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div><Label htmlFor="event-time">Time</Label><Input type="time" id="event-time" className="mt-2" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div><div><Label htmlFor="event-location">Location or meeting link</Label><Input id="event-location" className="mt-2" value={location} onChange={(e) => setLocation(e.target.value)} required /></div><div><Label htmlFor="event-format">Format</Label><Select value={format} onValueChange={(value) => setFormat(value as EventItem["format"])}><SelectTrigger id="event-format" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="In person">In person</SelectItem><SelectItem value="Online">Online</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit"><Plus /> Add event</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
-function NewsletterPreview({ newsletter, onOpenChange }: { newsletter: Newsletter | null; onOpenChange: (open: boolean) => void }) {
-  return <Dialog open={Boolean(newsletter)} onOpenChange={onOpenChange}><DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl"><DialogHeader className="sr-only"><DialogTitle>Newsletter preview</DialogTitle><DialogDescription>Preview of the selected newsletter</DialogDescription></DialogHeader>{newsletter && <div className="bg-[#edf0f5] p-4 sm:p-8"><div className="mx-auto max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(26,38,70,.16)]"><div className="relative h-56 bg-[#18285e]"><img src="/images/collective-meditation.jpg" alt="People sharing a collective meditation" className="h-full w-full object-cover opacity-60" /><div className="absolute inset-0 bg-gradient-to-t from-[#17275f] via-transparent to-transparent" /><div className="absolute bottom-5 left-6 right-6"><p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#ffd08c]">Sahaja Yoga · Friends newsletter</p><h2 className="mt-2 font-serif text-[34px] font-semibold leading-none text-white">{newsletter.title}</h2></div></div><div className="p-6 sm:p-8"><p className="font-serif text-[21px] text-[#233154]">Dear friends,</p><p className="mt-4 text-sm leading-7 text-[#66738f]">We warmly invite you to pause, turn your attention within, and enjoy a collective meditation with us. Everyone is welcome, and the session is always free.</p><div className="my-6 rounded-2xl bg-[#f1f5ff] p-5"><p className="text-[11px] font-bold uppercase tracking-wide text-[#6f83ba]">Next gathering</p><p className="mt-2 font-serif text-[23px] font-semibold">Weekly meditation · Ulm</p><p className="mt-2 text-sm text-[#62708d]">Monday, 14 September · 18:00–20:00</p></div><Button className="w-full bg-[#175cdf]">Reserve a place</Button><p className="mt-6 text-center text-[11px] leading-5 text-[#939caf]">You are receiving this sample because this is a demonstration workspace. No email has been sent.</p></div></div></div>}</DialogContent></Dialog>;
+function NewsletterPreview({newsletter,onOpenChange}:{newsletter:Newsletter|null;onOpenChange:(open:boolean)=>void}){
+ const [html,setHtml]=useState(""),[error,setError]=useState("");
+ useEffect(()=>{setHtml("");setError("");if(!newsletter)return;const abort=new AbortController();fetch(`/api/campaigns/${newsletter.id}`,{signal:abort.signal}).then(async r=>{const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not load newsletter");setHtml(renderDocument(d.campaign).html);}).catch(e=>{if(e.name!=="AbortError")setError(e.message);});return()=>abort.abort();},[newsletter?.id]);
+ return <Dialog open={!!newsletter} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-3xl"><DialogHeader><DialogTitle>{newsletter?.title}</DialogTitle><DialogDescription>Saved newsletter · responsive HTML preview</DialogDescription></DialogHeader>{error?<p role="alert">{error}</p>:<iframe title="Saved newsletter preview" sandbox="" srcDoc={html} className="h-[75vh] w-full border-0"/>}</DialogContent></Dialog>;
 }

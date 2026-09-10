@@ -37,3 +37,13 @@ CREATE TABLE IF NOT EXISTS delivery_messages (
 CREATE INDEX IF NOT EXISTS idx_campaigns_status_updated ON campaigns(status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_subscribers_status_created ON subscribers(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_delivery_campaign_status ON delivery_messages(campaign_id, status);
+
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS campaign_links (
+ id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL,label TEXT NOT NULL,destination_url TEXT NOT NULL,position INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS tracking_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,campaign_id TEXT NOT NULL,subscriber_id TEXT,event_type TEXT NOT NULL,link_id TEXT,provider_event_id TEXT UNIQUE,occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tracking_campaign_type_time ON tracking_events(campaign_id,event_type,occurred_at);
+CREATE INDEX IF NOT EXISTS idx_campaign_links_campaign ON campaign_links(campaign_id);

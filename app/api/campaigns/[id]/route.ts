@@ -16,6 +16,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const auth = await requireAdminApi(); if (auth.response) return auth.response;
   try {
     const { id } = await context.params; const body = await request.json() as Record<string, unknown>;
+    const existing=await getDatabase().prepare("SELECT status,provider_campaign_id AS providerCampaignId FROM campaigns WHERE id=?").bind(id).first<{status:string;providerCampaignId:string|null}>();
+    if(!existing)return json({error:"Newsletter not found"},{status:404});
+    if(existing.status!=="draft"||existing.providerCampaignId)return json({error:"Start a new copy to edit a delivered or scheduled edition"},{status:409});
     const blocks = Array.isArray(body.blocks) ? body.blocks as EmailBlock[] : [];
     if (!blocks.length) throw new Error("Add at least one content block");
     const subject = cleanText(body.subject, 180); if (!subject) throw new Error("Subject is required");

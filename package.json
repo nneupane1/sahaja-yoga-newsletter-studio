@@ -83,7 +83,8 @@
     "files": [
       "desktop/**/*",
       "desktop-dist/renderer/**/*",
-      "package.json"
+      "package.json",
+      "lib/*.mjs"
     ],
     "asar": true,
     "win": {
