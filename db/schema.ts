@@ -28,6 +28,7 @@ export const campaignLinks = sqliteTable("campaign_links", {
 
 export const events = sqliteTable("events", {
   id: text("id").primaryKey(), title: text("title").notNull(), description: text("description").notNull().default(""),
+  imageUrl: text("image_url").notNull().default(""),
   startsAt: text("starts_at").notNull(), location: text("location").notNull().default(""), capacity: integer("capacity").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`), updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("idx_events_starts_at").on(table.startsAt)]);

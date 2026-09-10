@@ -113,7 +113,7 @@ export default function Home() {
   const [workspaceError,setWorkspaceError]=useState("");
   const refreshWorkspace=async()=>{const r=await fetch("/api/workspace");const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not load workspace");setWorkspace(d);setWorkspaceError("");};
   const updateWorkspace=async(patch:any)=>{const r=await fetch("/api/workspace",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not save preferences");setWorkspace(d);};
-  useEffect(()=>{if(access!=="ready")return;const refresh=()=>{void fetch("/api/events").then(r=>r.json()).then((d:any)=>{if(Array.isArray(d.events))setEvents(d.events.map((e:any)=>({...e,date:new Date(e.startsAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}),time:new Date(e.startsAt).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}),format:"In person",image:"/images/collective-meditation.jpg",rsvps:0})));}).catch(()=>undefined);void refreshWorkspace().catch(e=>setWorkspaceError(e.message));};refresh();window.addEventListener("studio:changed",refresh);window.addEventListener("focus",refresh);return()=>{window.removeEventListener("studio:changed",refresh);window.removeEventListener("focus",refresh);};},[access]);
+  useEffect(()=>{if(access!=="ready")return;const refresh=()=>{void fetch("/api/events").then(r=>r.json()).then((d:any)=>{if(Array.isArray(d.events))setEvents(d.events.map((e:any)=>({...e,date:new Date(e.startsAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}),time:new Date(e.startsAt).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}),format:"In person",image:e.imageUrl||"/images/collective-meditation.jpg",rsvps:0})));}).catch(()=>undefined);void refreshWorkspace().catch(e=>setWorkspaceError(e.message));};refresh();window.addEventListener("studio:changed",refresh);window.addEventListener("focus",refresh);return()=>{window.removeEventListener("studio:changed",refresh);window.removeEventListener("focus",refresh);};},[access]);
 
 
   useEffect(() => {
@@ -179,7 +179,7 @@ export default function Home() {
   };
 
   const addEvent = async (item: EventItem & {startsAt?:string}) => {
-    try{const r=await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...item,startsAt:item.startsAt})});const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not save event");setEvents(current=>[{...item,id:d.event.id},...current]);setEventOpen(false);window.dispatchEvent(new Event("studio:changed"));toast.success("Event saved to your workspace");}catch(e){toast.error(e instanceof Error?e.message:"Could not save event");}
+    try{const r=await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...item,startsAt:item.startsAt,imageUrl:item.image})});const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not save event");setEvents(current=>[{...item,id:d.event.id},...current]);setEventOpen(false);window.dispatchEvent(new Event("studio:changed"));toast.success("Event saved to your workspace");}catch(e){toast.error(e instanceof Error?e.message:"Could not save event");}
   };
 
   const importSubscribers = (file?: File) => {
@@ -217,11 +217,11 @@ export default function Home() {
   if (access !== "ready") return <AccessScreen state={access} />;
 
   return (
-    <div className="min-h-screen bg-transparent text-[#17213f]">
+    <div className="studio-shell min-h-screen bg-transparent text-[#17213f]">
       <Toaster position="bottom-right" richColors />
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col border-r border-[#e4e8f1] bg-white transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`studio-sidebar fixed inset-y-0 left-0 z-50 flex w-[236px] flex-col border-r border-[#e4e8f1] bg-white transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <Brand />
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 pb-5 scrollbar-thin">
           <p className="px-3 pb-2 pt-1 text-[12px] font-bold uppercase tracking-[.12em] text-[#8b95ac]">Workspace</p>
@@ -233,7 +233,7 @@ export default function Home() {
                 <button key={item.id} onClick={() => changeView(item.id)} className={`focus-ring flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-semibold transition ${active ? "bg-[#155bd7] text-white shadow-[0_7px_18px_rgba(21,91,215,.2)]" : "text-[#4e5b78] hover:bg-[#f0f4fb] hover:text-[#1f315d]"}`}>
                   <Icon className="size-[18px]" strokeWidth={active ? 2.3 : 1.9} />
                   {item.label}
-                  {item.id === "rsvps" && <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] ${active ? "bg-white/18" : "bg-[#eaf0fd] text-[#155bd7]"}`}>281</span>}
+
                 </button>
               );
             })}
@@ -251,8 +251,8 @@ export default function Home() {
 
       {mobileNavOpen && <button aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-40 bg-[#11182d]/35 md:hidden" />}
 
-      <div className="md:pl-[272px]">
-        <header className="sticky top-0 z-30 flex min-h-[74px] items-center gap-3 border-b border-[#e5e9f1] bg-white/90 px-4 backdrop-blur-xl md:px-7">
+      <div className="md:pl-[236px]">
+        <header className="studio-header sticky top-0 z-30 flex min-h-[74px] items-center gap-3 border-b border-[#e5e9f1] bg-white/90 px-4 backdrop-blur-xl md:px-7">
           <Button aria-label="Open navigation" variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)} className="md:hidden"><Menu /></Button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-bold uppercase tracking-[.1em] text-[#8b95ac]">Newsletter studio</p>
@@ -263,7 +263,7 @@ export default function Home() {
 
         </header>
 
-        <main className="mx-auto max-w-[1540px] p-4 md:p-7">
+        <main className="mx-auto max-w-[1760px] p-4 md:p-7">
           {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
           {activeView === "editor" && <EditorView key={editorKey} />}
           {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
@@ -288,12 +288,12 @@ export default function Home() {
 
 function Brand() {
   return (
-    <div className="flex h-[66px] items-center px-4"><BrandLogo /></div>
+    <div className="flex h-[65.8px] items-center px-4"><BrandLogo /></div>
   );
 }
 
 function BrandLogo({ compact = false }: { compact?: boolean }) {
-  return <div className={`relative shrink-0 overflow-hidden bg-white ${compact ? "h-[45px] w-[109px]" : "h-[50.4px] w-[128.8px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[777.7px]" : "w-[896px]"}`} /></div>;
+  return <div className={`relative shrink-0 overflow-hidden rounded bg-white ${compact ? "h-[45px] w-[109px]" : "h-[50.4px] w-[128.8px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[777.7px]" : "w-[896px]"}`} /></div>;
 }
 
 function AccessScreen({ state }: { state: "loading" | "signed-out" | "forbidden" | "error" }) {
@@ -311,7 +311,7 @@ function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string
 }
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-2xl border border-[#e2e6ef] bg-white shadow-[0_10px_32px_rgba(35,48,84,.045)] ${className}`}>{children}</section>;
+  return <section className={`studio-panel ${className}`}>{children}</section>;
 }
 
 function PanelTitle({ title, caption, action }: { title: string; caption?: string; action?: ReactNode }) {
@@ -447,6 +447,9 @@ function ReportsView() {
 function SettingsView() {
   const [provider, setProvider] = useState<{ connected?: boolean; listName?: string; memberCount?: number; error?: string } | null>(null);
   const [runtime, setRuntime] = useState<"desktop" | "web">("web");
+  const [senderGroups,setSenderGroups]=useState<Array<{id:string;title:string}>>([]);
+  const [groupsLoading,setGroupsLoading]=useState(false);
+  const loadSenderGroups=async()=>{setGroupsLoading(true);try{const r=await fetch("/api/local/sender-groups");const d:any=await r.json();if(!r.ok)throw new Error(d.error||"Could not load groups");setSenderGroups(d.groups);toast.success(`${d.groups.length} Sender groups loaded`);}catch(e){toast.error(e instanceof Error?e.message:"Could not load groups");}finally{setGroupsLoading(false);}};
   const [delivery, setDelivery] = useState({ apiToken: "", hasApiToken: false, senderGroupId: "", fromName: "Sahaja Yoga Newsletter", replyTo: "", workspace: "" });
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -489,7 +492,7 @@ function SettingsView() {
 
   return (
     <>
-      <PageHeading eyebrow="Workspace" title="Settings" description="Connect free Sender delivery, protect organiser credentials, and control the local workspace." />
+      <PageHeading eyebrow="Workspace" title="Settings" description="Connect free Sender delivery, protect organiser credentials, and control the local workspace." /><Panel className="mb-5 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold">Set up free newsletter delivery</h3><p className="mt-1 text-sm text-slate-500">Up to 2,500 subscribers and 15,000 emails/month. One Sender seat; Sender branding remains. Checked September 2026.</p></div><a href="https://auth.sender.net/register?client_id=21&redirect_uri=https%3A%2F%2Fapp.sender.net%2F&response_type=code&scope=scope" target="_blank" rel="noreferrer" className="rounded-xl bg-[#175cdf] px-4 py-3 text-sm font-bold text-white">Create free Sender account</a></div><ol className="mt-4 grid list-inside list-decimal gap-3 text-sm leading-6 text-slate-600 md:grid-cols-2"><li>Register, verify your email and complete the organisation profile.</li><li>Add your sending domain under Account settings → Domains and verify its DNS records.</li><li>Create a Sahaja Yoga Newsletter group and import subscribed contacts.</li><li>Create an API token in Sender Settings. Save it below in the desktop app, load your group and send a test first.</li></ol><p className="mt-4 text-xs text-slate-500">Choose one organiser to manage dispatch. Your five studio users do not require five Sender logins. <a className="text-blue-600 underline" href="https://www.sender.net/pricing/" target="_blank" rel="noreferrer">Plan details</a> · <a className="text-blue-600 underline" href="https://www.sender.net/help/deliverability-compliance/spf-dkim-dmarc-setup/" target="_blank" rel="noreferrer">Domain setup guide</a></p></Panel>
       <div className="grid gap-5 xl:grid-cols-[1fr_.7fr]">
         <div className="space-y-5">
           <Panel className="p-5">
@@ -500,7 +503,7 @@ function SettingsView() {
             {runtime === "desktop" ? <>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2"><Label htmlFor="sender-token">API access token</Label><Input id="sender-token" type="password" className="mt-2" value={delivery.apiToken} onChange={(event) => setDelivery((current) => ({ ...current, apiToken: event.target.value }))} placeholder={delivery.hasApiToken ? "Saved securely · enter only to replace" : "Paste token from Sender settings"} /></div>
-                <div><Label htmlFor="sender-group">Subscriber group ID</Label><Input id="sender-group" className="mt-2" value={delivery.senderGroupId} onChange={(event) => setDelivery((current) => ({ ...current, senderGroupId: event.target.value }))} placeholder="e.g. elxJK6" /></div>
+                <div><Label htmlFor="sender-group">Subscriber group</Label>{senderGroups.length?<Select value={delivery.senderGroupId} onValueChange={v=>setDelivery(c=>({...c,senderGroupId:v}))}><SelectTrigger id="sender-group" className="mt-2"><SelectValue placeholder="Choose your newsletter group"/></SelectTrigger><SelectContent>{senderGroups.map(g=><SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}</SelectContent></Select>:<Input id="sender-group" className="mt-2" value={delivery.senderGroupId} onChange={(event)=>setDelivery(c=>({...c,senderGroupId:event.target.value}))} placeholder="Save token, then load groups"/>}<Button type="button" variant="ghost" size="sm" className="mt-2" disabled={groupsLoading||!delivery.hasApiToken} onClick={loadSenderGroups}>{groupsLoading?"Loading…":"Load groups from Sender"}</Button></div>
                 <div><Label htmlFor="sender-from">From name</Label><Input id="sender-from" className="mt-2" value={delivery.fromName} onChange={(event) => setDelivery((current) => ({ ...current, fromName: event.target.value }))} /></div>
                 <div className="sm:col-span-2"><Label htmlFor="sender-reply">Verified sender / reply-to email</Label><Input id="sender-reply" type="email" className="mt-2" value={delivery.replyTo} onChange={(event) => setDelivery((current) => ({ ...current, replyTo: event.target.value }))} placeholder="newsletter@your-domain.org" /></div>
               </div>
@@ -554,11 +557,12 @@ function EventDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenCh
   const [time, setTime] = useState("18:00");
   const [location, setLocation] = useState("Ulm");
   const [format, setFormat] = useState<EventItem["format"]>("In person");
+  const [imageUrl,setImageUrl]=useState("");
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onCreate({ id: `e-${Date.now()}`, startsAt:new Date(`${date}T${time}`).toISOString(), title, date, time, location, format, rsvps: 0, capacity: 30, image: "/images/collective-meditation.jpg" });
+    onCreate({ id: `e-${Date.now()}`, startsAt:new Date(`${date}T${time}`).toISOString(), title, date, time, location, format, rsvps: 0, capacity: 30, image: imageUrl });
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Add an event</DialogTitle><DialogDescription>Create an event card that can be inserted into a newsletter.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label htmlFor="event-title">Event title</Label><Input id="event-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="event-date">Date</Label><Input type="date" id="event-date" className="mt-2" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div><Label htmlFor="event-time">Time</Label><Input type="time" id="event-time" className="mt-2" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div><div><Label htmlFor="event-location">Location or meeting link</Label><Input id="event-location" className="mt-2" value={location} onChange={(e) => setLocation(e.target.value)} required /></div><div><Label htmlFor="event-format">Format</Label><Select value={format} onValueChange={(value) => setFormat(value as EventItem["format"])}><SelectTrigger id="event-format" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="In person">In person</SelectItem><SelectItem value="Online">Online</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit"><Plus /> Add event</Button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle className="font-serif text-[28px]">Add an event</DialogTitle><DialogDescription>Create an event card that can be inserted into a newsletter.</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4"><div><Label htmlFor="event-title">Event title</Label><Input id="event-title" className="mt-2" value={title} onChange={(e) => setTitle(e.target.value)} required /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="event-date">Date</Label><Input type="date" id="event-date" className="mt-2" value={date} onChange={(e) => setDate(e.target.value)} required /></div><div><Label htmlFor="event-time">Time</Label><Input type="time" id="event-time" className="mt-2" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div><div><Label htmlFor="event-location">Location or meeting link</Label><Input id="event-location" className="mt-2" value={location} onChange={(e) => setLocation(e.target.value)} required /></div><div><Label htmlFor="event-photo">Event photo URL</Label><Input type="url" id="event-photo" className="mb-4 mt-2" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} placeholder="https://…"/><Label htmlFor="event-format">Format</Label><Select value={format} onValueChange={(value) => setFormat(value as EventItem["format"])}><SelectTrigger id="event-format" className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="In person">In person</SelectItem><SelectItem value="Online">Online</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent></Select></div><DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit"><Plus /> Add event</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function NewsletterPreview({newsletter,onOpenChange}:{newsletter:Newsletter|null;onOpenChange:(open:boolean)=>void}){

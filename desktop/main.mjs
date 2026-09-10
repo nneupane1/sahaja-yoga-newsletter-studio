@@ -1,4 +1,4 @@
-import { getSenderStatistics, canonicalLink, personKey } from "../lib/sender-statistics.mjs";
+import { getSenderStatistics, canonicalLink, personKey, listAll } from "../lib/sender-statistics.mjs";
 import { dashboardData } from "../lib/dashboard-data.mjs";
 import { userInfo } from "node:os";
 import { templateCatalog } from "../lib/newsletter-templates.mjs";
@@ -72,6 +72,11 @@ function setupWorkspace() {
   const databasePath = path.join(folders.database, "newsletter-studio.db");
   database = new DatabaseSync(databasePath);
   database.exec(readFileSync(path.join(__dirname, "local-schema.sql"), "utf8"));
+  const eventColumns=new Set(database.prepare("PRAGMA table_info(events)").all().map(c=>c.name));
+  if(!eventColumns.has("image_url"))database.exec("ALTER TABLE events ADD COLUMN image_url TEXT NOT NULL DEFAULT ''");
+  if(!database.prepare("SELECT key FROM settings WHERE key='workspace_seed_v2'").get()){
+    database.exec("BEGIN");try{database.exec(readFileSync(path.join(__dirname,"workspace-seed.sql"),"utf8"));database.prepare("INSERT INTO settings(key,value) VALUES('workspace_seed_v2','done')").run();database.exec("COMMIT");}catch(e){database.exec("ROLLBACK");throw e;}
+  }
   const campaignColumns = new Set(database.prepare("PRAGMA table_info(campaigns)").all().map((column) => column.name));
   for (const [column, definition] of [
     ["delivered_count", "INTEGER NOT NULL DEFAULT 0"],
@@ -310,6 +315,10 @@ async function api(request, response, url) {
     const counts = { campaigns: database.prepare("SELECT COUNT(*) count FROM campaigns").get().count, subscribers: database.prepare("SELECT COUNT(*) count FROM subscribers WHERE status='subscribed'").get().count, events: database.prepare("SELECT COUNT(*) count FROM events WHERE starts_at >= CURRENT_TIMESTAMP").get().count };
     return json(response, 200, { runtime: "desktop", user: { email: "local-organiser", name: app.getName() }, counts, provider: await providerStatus(), storage: { database: true, images: true, workspace: folders.root } });
   }
+  if(pathname === "/api/local/sender-groups" && method === "GET"){
+    const config=senderSettings();if(!config.apiToken)throw Error("Save your Sender API token first");
+    const groups=await listAll(senderRequest,"groups");return json(response,200,{groups:groups.map(g=>({id:String(g.id),title:String(g.title||g.name||g.id)}))});
+  }
   if (pathname === "/api/local/settings" && method === "GET") {
     const current = senderSettings();
     return json(response, 200, { configured: senderConfigured(current), senderGroupId: current.senderGroupId || "", fromName: current.fromName || "Sahaja Yoga Newsletter", replyTo: current.replyTo || "", hasApiToken: Boolean(current.apiToken), workspace: folders.root });
@@ -430,10 +439,10 @@ async function api(request, response, url) {
     }
     return json(response, 200, { synced, failed, total: contacts.length });
   }
-  if(pathname === "/api/events" && method === "GET")return json(response,200,{events:database.prepare("SELECT id,title,description,starts_at AS startsAt,location,capacity FROM events ORDER BY starts_at LIMIT 100").all()});
+  if(pathname === "/api/events" && method === "GET")return json(response,200,{events:database.prepare("SELECT id,title,description,starts_at AS startsAt,location,image_url AS imageUrl,capacity FROM events ORDER BY starts_at LIMIT 100").all()});
   if(pathname === "/api/events" && method === "POST"){
    const input=await readJson(request),title=clean(input.title,180);if(!title||!input.startsAt||!Number.isFinite(Date.parse(input.startsAt)))throw Error("Enter an event title and valid start date");
-   const eventId=id("evt"),startsAt=new Date(input.startsAt).toISOString();database.prepare("INSERT INTO events(id,title,description,starts_at,location,capacity) VALUES(?,?,?,?,?,?)").run(eventId,title,clean(input.description,2000),startsAt,clean(input.location,250),Math.max(0,Math.min(Number(input.capacity)||0,10000)));
+   const eventId=id("evt"),startsAt=new Date(input.startsAt).toISOString();database.prepare("INSERT INTO events(id,title,description,starts_at,location,image_url,capacity) VALUES(?,?,?,?,?,?,?)").run(eventId,title,clean(input.description,2000),startsAt,clean(input.location,250),/^https:\/\//.test(String(input.imageUrl||""))?clean(input.imageUrl,2000):"",Math.max(0,Math.min(Number(input.capacity)||0,10000)));
    return json(response,201,{event:{id:eventId,title,startsAt}});
   }
   if (pathname === "/api/assets" && method === "POST") {

@@ -7,7 +7,7 @@
 }
 
 :root {
-  --background: #f6f7fb;
+  --background: #e8f0fc;
   --foreground: #17213f;
   --card: #ffffff;
   --card-foreground: #17213f;
@@ -22,7 +22,7 @@
   --accent: #e8efff;
   --accent-foreground: #1547a7;
   --destructive: #c9364f;
-  --border: #e3e7f0;
+  --border: #d8e4f6;
   --input: #dfe4ee;
   --ring: #6f98ed;
   --chart-1: #1caf70;
@@ -88,8 +88,10 @@ html { background: var(--background); }
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 78% -10%, rgba(23, 92, 223, 0.08), transparent 28rem),
-    var(--background);
+    radial-gradient(ellipse at 85% 0%, #d1e9ff 0, transparent 46%),
+    radial-gradient(ellipse at 20% 40%, #e0e4ff 0, transparent 55%),
+    linear-gradient(145deg, #f7fbff 0%, #e8f0fc 48%, #e0eafa 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
 }
@@ -113,3 +115,16 @@ button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
     scroll-behavior: auto !important;
   }
 }
+
+/* Consistent glass surfaces for the organiser workspace, with opaque fallbacks. */
+.studio-shell { min-height:100vh; }
+.studio-sidebar { background:linear-gradient(165deg,rgba(255,255,255,.96),rgba(240,247,255,.91));backdrop-filter:blur(24px);box-shadow:6px 0 30px #274b8010;border-color:#ffffffc9; }
+.studio-header { background:linear-gradient(110deg,rgba(255,255,255,.92),rgba(237,246,255,.86));border-color:#ffffffd9;box-shadow:0 5px 25px #365b8610; }
+.studio-panel { background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(248,252,255,.91));border:1px solid #ffffff;box-shadow:0 8px 28px #294c7910,inset 0 1px 0 #fff;backdrop-filter:blur(14px);border-radius:18px; }
+.studio-panel > div:first-child { background:linear-gradient(110deg,#ffffff70,#eaf3ff40); }
+.studio-shell button { transition:background-color .18s,box-shadow .18s,transform .18s; }
+.studio-shell button:focus-visible { outline:3px solid #91b9ff;outline-offset:3px; }
+.studio-shell button[data-variant="default"] { background:linear-gradient(150deg,#307bfd,#1252d2);box-shadow:0 4px 12px #175cdf25,inset 0 1px 0 #ffffff35; }
+.studio-profile { background:linear-gradient(145deg,#ffffff,#edf4ff);box-shadow:0 3px 12px #234b8312,inset 0 1px 0 #fff;border:1px solid #fff; }
+.event-photo { box-shadow:0 4px 12px #1d345626; }
+@media(prefers-reduced-motion:reduce){.studio-shell button{transition:none}}

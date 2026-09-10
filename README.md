@@ -357,21 +357,27 @@ The app creates its folders and SQLite database automatically. No PostgreSQL/MyS
 
 ## Sender account setup
 
-1. Create or open the organisation's [Sender](https://www.sender.net/) account.
-2. Verify the organisation's sending domain or sender email according to Sender's current instructions.
-3. Create a group for newsletter subscribers.
-4. Generate an API access token in Sender.
-5. In Newsletter Studio, open **Settings** and enter:
-   - API access token;
-   - Sender group ID;
-   - from name; and
-   - verified reply-to address.
-6. Save and confirm that the status changes to **Sender · connected**.
-7. Send only to organiser test addresses until HTML, links, unsubscribe behaviour, and inbox placement are approved.
+Sender's [current free plan](https://www.sender.net/pricing/) (checked 10 September 2026) includes 2,500 subscribers, 15,000 emails per month, one account seat, and required Sender branding. No credit card is required. Choose one designated organiser to dispatch through that account; the five Studio organisers do not receive five Sender seats.
+
+1. [Create a Sender account](https://auth.sender.net/register?client_id=21&redirect_uri=https%3A%2F%2Fapp.sender.net%2F&response_type=code&scope=scope), select Free Forever, verify your email, and complete the organisation profile.
+2. Open **Account settings → Domains → Add domain**. Verify a mailbox on your sending domain and add the exact DNS records Sender provides for SPF, DKIM, and DMARC. Follow the [official domain guide](https://www.sender.net/help/deliverability-compliance/spf-dkim-dmarc-setup/); merge an existing SPF record instead of creating a second one, and retain an intentional existing DMARC policy. DNS changes can take 24–48 hours.
+3. Under **Subscribers → Groups**, create **Sahaja Yoga Newsletter**. Import subscribed contacts from Mailchimp into this group, map the email and name fields, and preserve unsubscribes and other suppressions. See [Sender's import guide](https://www.sender.net/help/subscribers-and-segmentation/importing-subscribers/).
+4. Under **Settings → API access tokens**, create a token. In the **desktop** Studio's **Settings**, paste it, enter the verified sender identity, and save. Click **Load groups**, select your newsletter group, and save again. Do not paste the token into chat or the hosted preview.
+5. Confirm the connection, then send to organiser test addresses. Check images, links, unsubscribe behaviour, and inbox placement before selecting the full group for a campaign send.
+
+The app serializes API requests and backs off on rate limits. Sender controls bulk delivery timing; a deliberately slow client cannot guarantee that the provider will never reject a request.
 
 The API token is encrypted with Electron's operating-system-backed `safeStorage` facility before being written to `settings.json`. The clear token is used only in memory for requests to Sender and is never saved in a draft, exported newsletter, or Git repository.
 
 ## Organiser workflow
+
+### Dashboard appearance and starter content
+
+The dashboard uses a pearl-blue gradient, translucent panels, and a persistent desktop sidebar. The reference logo is rendered at 70% of its original dimensions. The greeting and profile initials come from the active organiser, while the bell and date range use the workspace controls.
+
+The campaign title is stored in the database. A one-time migration renames only untouched legacy placeholder drafts to **Music and Meditation**; it preserves sent campaigns and custom titles. New empty workspaces receive a starter draft. Five illustrated event planning entries come from the supplied September 2026 München newsletter. Their descriptions identify the source and ask organisers to confirm dates, times, and programmes before sending. These are editable planning records, not fabricated attendance or engagement results.
+
+Upcoming events use each event's stored HTTPS image URL, with a local image fallback. The separate public-facing “From We Meditate” promotional card is removed. Engagement, audience, top links, content performance, and historical campaign sections continue to read the workspace analytics.
 
 ### 1. Prepare the audience
 

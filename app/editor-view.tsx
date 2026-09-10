@@ -50,7 +50,7 @@ type MobilePanel = "content" | "blocks" | "design" | "settings" | null;
 
 export function EditorView() {
   const [campaignId, setCampaignId] = useState<string | null>(null);
-  const [title, setTitle] = useState("Sahaja Yoga · Ein Sommer voller Begegnungen");
+  const [title, setTitle] = useState("Music and Meditation");
   const [subject, setSubject] = useState("Ein Sommer voller Begegnungen · Sahaja Yoga");
   const [preheader, setPreheader] = useState("Aktuelles, Rückblicke und kommende Veranstaltungen");
   const [fromName, setFromName] = useState("Sahaja Yoga Newsletter");

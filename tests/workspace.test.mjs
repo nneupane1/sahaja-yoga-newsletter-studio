@@ -22,6 +22,8 @@ for(const flavor of ['desktop','hosted'])test(`${flavor} dashboard isolates camp
  const db=new DatabaseSync(':memory:');
  const schema=flavor==='desktop'?readFileSync(new URL('../desktop/local-schema.sql',import.meta.url),'utf8'):readFileSync(new URL('../drizzle/0000_classy_titanium_man.sql',import.meta.url),'utf8');
  db.exec(schema);
+ if(flavor==='hosted')db.exec("ALTER TABLE events ADD COLUMN image_url TEXT NOT NULL DEFAULT ''");
+ else if(!db.prepare("PRAGMA table_info(events)").all().some(c=>c.name==='image_url'))db.exec("ALTER TABLE events ADD COLUMN image_url TEXT NOT NULL DEFAULT ''");
  const created=flavor==='hosted'?',created_by':'';const owner=flavor==='hosted'?",'organiser'":'';
  db.exec(`INSERT INTO campaigns(id,title,recipient_count,status,content_json${created}) VALUES('a','Tour',10,'sent','[]'${owner}),('b','Other',50,'sent','[]'${owner});INSERT INTO subscribers(id,email,email_hash) VALUES('s','test@example.org','hash');INSERT INTO events(id,title,starts_at) VALUES('e','Music','2027-10-01');INSERT INTO rsvps(id,event_id,campaign_id,status) VALUES('r1','e','a','confirmed'),('r2','e','a','pending'),('r3','e','b','confirmed');INSERT INTO campaign_links(id,campaign_id,label,destination_url) VALUES('l','a','Album','https://photos.app.goo.gl/test');INSERT INTO tracking_events(campaign_id,subscriber_id,event_type,link_id) VALUES('a','s','click','l'),('a','s','click','l'),('a','s','open',NULL),('b','s','click',NULL);`);
  const data=await dashboardData(async(sql,args)=>db.prepare(sql).all(...args),{campaignId:'a',from:'2020-01-01',to:'2030-01-01'});

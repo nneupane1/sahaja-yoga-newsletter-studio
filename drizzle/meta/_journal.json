@@ -15,6 +15,13 @@
       "when": 1789015670537,
       "tag": "0001_clammy_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789040391771,
+      "tag": "0002_happy_santa_claus",
+      "breakpoints": true
     }
   ]
 }
