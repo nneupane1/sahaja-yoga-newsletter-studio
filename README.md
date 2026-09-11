@@ -167,7 +167,7 @@ The editor is the centre of the system. On wide screens it uses three columns: c
 | Block | Typical use | Editable properties |
 | --- | --- | --- |
 | Story | Connected event report and image | Date/place, title, paragraphs, left/right/above/below photo, caption, album or booking button |
-| Gallery | Event photographs and album | Up to three independently editable photos, alt text, captions, album link |
+| Gallery | Event photographs and album | Three independent photos or one composed 2–6 photo collage, alt text, captions, album link |
 | Hero | Newsletter identity and lead story | Eyebrow, title, text, image |
 | Heading | Section titles | Text, size, alignment, colour |
 | Text | Reports, invitations, schedules, closing | Copy, alignment, colour |
@@ -195,9 +195,13 @@ The image workflow addresses the common pain points of composing newsletters in 
 
 Edited local images are written to the application's media store and referenced by the draft. Export the edited PNG to the organisation’s approved public media hosting and replace the draft’s image URL before sending. The app blocks localhost and base64 images during desktop delivery; automatic provider media uploading is not implemented.
 
+### Collage studio
+
+The gallery properties include **Create one photo collage**. An organiser can select two to six original photographs and choose Feature left, Feature top, Balanced grid, or Film strip. The composition supports wide, landscape, square, and portrait canvases; adjustable gaps, rounded corners, and background colour; photo reordering; and independent zoom plus horizontal and vertical focal position for every photograph. Apply collage saves one PNG into the draft while preserving the gallery's album button. Export PNG produces the same composition for approved public media hosting.
+
 ### Master newsletter structure
 
-The bundled German-language organiser template contains:
+The two supplied HTML newsletters are represented by named masters: **München Community Journal · Master** and **United Europe Tour · Master**. Tour Spotlight and Quiet Digest provide two additional professional variations. The German-language community master contains:
 
 1. issue number and Sahaja Yoga hero;
 2. greeting and opening note;

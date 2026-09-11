@@ -38,10 +38,10 @@ The public HTML also contains raw Mailchimp subject/preview tokens. These are re
 
 | Template | Use | Palette | Composition |
 | --- | --- | --- | --- |
-| Community Journal | A substantial newsletter covering activity since the last issue | Navy, blue, white | Featured invitation, recurring sessions, five reports and individual galleries |
+| München Community Journal · Master | A substantial newsletter based on the supplied latest issue | Navy, blue, white | Featured invitation, recurring sessions, five reports and collage-ready galleries |
 | Tour Spotlight | A community issue with a prominent leading event | Burgundy, gold, warm white | Generous event feature followed by the full journal |
 | Quiet Digest | A shorter overview | Deep teal, cool white | Alternating image/text stories with album buttons |
-| Event Invitation | A special tour announcement | Plum, rose, warm white | Opening invitation, afternoon/evening cards, teaser and supporting updates |
+| United Europe Tour · Master | A special tour announcement based on the supplied tour issue | Plum, rose, warm white | Opening invitation, afternoon/evening cards, teaser and supporting updates |
 
 The template picker loads its catalogue from the backend. The previous-newsletter list also loads saved records. Starting from an old edition gives every block a new identity and starts a separate draft. Unsaved changes in the current editable draft are saved before switching. Delivered or provider-connected editions are protected from accidental overwrite.
 
@@ -49,7 +49,7 @@ The template picker loads its catalogue from the backend. The previous-newslette
 
 A story block keeps a title, date/place line, paragraphs, photograph, caption and optional button together. Its photograph can sit to the left, right, above or below the text. This supports a clear relationship between a report and the picture that explains it.
 
-A gallery holds up to three photographs, each with its own image URL, alt text and caption. The organiser selects Photo 1, 2 or 3 before replacing or editing it. An album button belongs to that gallery, so it stays beside the relevant event when blocks are moved.
+A gallery holds up to three independently placed photographs, each with its own image URL, alt text and caption. It also opens Collage Studio, which combines two to six originals into one PNG. Feature-left, feature-top, balanced-grid and film-strip layouts preserve the collage pattern seen in the source newsletters. Organisers can reorder photos, choose the featured photo, change canvas ratio, gaps, corners and background, and adjust each photo's zoom and focal point. Applying the collage leaves the gallery's album button beside the relevant event.
 
 Image Studio provides crop ratios, focal position, zoom, rotation, horizontal/vertical flips, brightness, contrast, saturation and opacity. The preview and PNG export now share the same canvas transformation. Adjustments create a new file rather than overwriting the original. Export PNG provides a copy for the organisation’s media hosting.
 
