@@ -1,6 +1,6 @@
 # Sahaja Yoga Newsletter Studio
 
-> **Shareable Vercel preview:** A separate static build now includes the responsive studio, four newsletter masters, saved drafts, editable organiser profile, notifications and browser-owned image uploads. See [Vercel preview deployment](docs/vercel-preview.md). Deployment is pending authorisation for the owner's Vercel workspace; the proposed hostname is not yet verified live.
+> **[Open the shareable preview](https://sahaja-yoga-newsletter-studio.vercel.app):** The separate Vercel build includes the responsive studio, four newsletter masters, saved drafts, editable organiser profile, notifications and browser-owned image uploads. Phones have a visible Home / Editor / Newsletters / More navigation bar; More opens all workspace sections. See [Vercel preview deployment](docs/vercel-preview.md).
 
 > **September 2026 update:** The home dashboard now restores the reference’s audience, engagement, link/content performance and campaign-history sections using saved records. Four source-informed templates, story/gallery editing, shared HTML preview, personalised greetings, notifications and reporting periods are described in [Newsletter design and dashboard integration](docs/newsletter-design.md). That document also identifies remaining delivery and legacy-screen limitations.
 
@@ -55,7 +55,7 @@ The application gives a small group of experienced organisers a polished desktop
 | Sender integration | Implemented | Connection test, subscriber sync, test send, schedule, campaign send, analytics |
 | Delivery safeguards | Implemented | Serialized calls, minimum request gap, retry handling, duplicate-send checks |
 | Hosted web edition | Preview | Protected visual/demo surface; production delivery is deliberately desktop-only |
-| Shareable Vercel build | Built and API-tested; deployment blocked | Browser-local drafts and uploads, sample analytics, no Sender credentials; workspace authorisation must be renewed before publishing |
+| Shareable Vercel build | Published through the owner's GitHub import | Browser-local drafts and uploads, sample analytics, no Sender credentials; mobile bottom navigation and full workspace drawer |
 | Windows x64 ZIP | Verified | Portable package builds successfully; unsigned distribution requires normal Windows caution |
 | Live Sender acceptance test | Required | Must be completed with the organisers' verified domain, group, and API token before real distribution |
 

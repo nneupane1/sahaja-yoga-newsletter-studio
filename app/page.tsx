@@ -34,6 +34,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -97,6 +98,12 @@ export default function Home() {
   const [backendStatus, setBackendStatus] = useState<{ runtime?: string; provider?: { connected?: boolean; name?: string; listName?: string; memberCount?: number }; counts?: { campaigns?: number; subscribers?: number; events?: number } } | null>(null);
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const closeOnDesktop = () => { if (desktop.matches) setMobileNavOpen(false); };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
   const [newsletterOpen, setNewsletterOpen] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [previewNewsletter, setPreviewNewsletter] = useState<Newsletter | null>(null);
@@ -222,7 +229,7 @@ export default function Home() {
       {backendStatus?.runtime === "preview" && <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 md:ml-[236px]" role="note"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</div>}
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
-      <aside className={`studio-sidebar fixed inset-y-0 left-0 z-50 flex w-[236px] flex-col border-r border-[#e4e8f1] bg-white transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className="studio-sidebar fixed inset-y-0 left-0 z-50 hidden w-[236px] flex-col border-r border-[#e4e8f1] bg-white md:flex">
         <Brand />
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 pb-5 scrollbar-thin">
           <p className="px-3 pb-2 pt-1 text-[12px] font-bold uppercase tracking-[.12em] text-[#8b95ac]">Workspace</p>
@@ -250,11 +257,26 @@ export default function Home() {
         </div>
       </aside>
 
-      {mobileNavOpen && <button aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-40 bg-[#11182d]/35 md:hidden" />}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <nav aria-label="Mobile workspace navigation" className="mobile-workspace-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 md:hidden">
+          {([{ id: "dashboard", label: "Home", Icon: LayoutDashboard }, { id: "editor", label: "Editor", Icon: FileText }, { id: "newsletters", label: "Newsletters", Icon: Mail }] as const).map(({ id, label, Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} className="mobile-workspace-tab" onClick={() => { if (activeView !== id) void changeView(id); }}><span className="mobile-workspace-icon"><Icon size={21} aria-hidden="true" /></span><span>{label}</span></button>)}
+          <SheetTrigger asChild><button type="button" className="mobile-workspace-tab" data-active={!["dashboard", "editor", "newsletters"].includes(activeView) || mobileNavOpen ? "true" : undefined} aria-label="More workspace sections"><span className="mobile-workspace-icon"><MoreHorizontal size={21} aria-hidden="true" /></span><span>More</span></button></SheetTrigger>
+        </nav>
+        <SheetContent side="left" showCloseButton={false} className="studio-mobile-drawer gap-0 border-white bg-[#f6faff]">
+          <div className="flex shrink-0 items-center justify-between border-b border-blue-100 pr-3">
+            <Brand />
+            <SheetClose asChild><Button variant="ghost" size="icon" className="size-11" aria-label="Close workspace menu"><X /></Button></SheetClose>
+          </div>
+          <div className="px-5 pb-3 pt-5"><SheetTitle className="text-xl">Your workspace</SheetTitle><SheetDescription className="mt-1">All your organiser tools</SheetDescription></div>
+          <nav aria-label="All workspace sections" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pb-5">
+            {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} onClick={() => { if (activeView === id) setMobileNavOpen(false); else void changeView(id); }} className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-left text-sm font-semibold focus-visible:outline-2 focus-visible:outline-blue-500 ${activeView === id ? "bg-[#155bd7] text-white shadow-md" : "text-[#4e5b78] hover:bg-blue-100"}`}><Icon size={20} aria-hidden="true" /><span>{label}</span>{activeView === id && <Check size={16} className="ml-auto" aria-hidden="true" />}</button>)}
+          </nav>
+        </SheetContent>
+      </Sheet>
 
       <div className="md:pl-[236px]">
         <header className="studio-header sticky top-0 z-30 flex min-h-[74px] items-center gap-3 border-b border-[#e5e9f1] bg-white/90 px-4 backdrop-blur-xl md:px-7">
-          <Button aria-label="Open navigation" variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)} className="md:hidden"><Menu /></Button>
+          <Button aria-label="Open workspace menu" aria-expanded={mobileNavOpen} aria-haspopup="dialog" variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)} className="md:hidden"><Menu /></Button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-bold uppercase tracking-[.1em] text-[#8b95ac]">Newsletter studio</p>
             <h1 className="truncate text-[18px] font-bold tracking-[-.02em] md:text-[21px]">{viewTitle}</h1>
@@ -264,7 +286,7 @@ export default function Home() {
 
         </header>
 
-        <main className="mx-auto max-w-[1760px] p-4 md:p-7">
+        <main className="studio-main mx-auto max-w-[1760px] p-4 md:p-7">
           {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
           {activeView === "editor" && <EditorView key={editorKey} />}
           {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}

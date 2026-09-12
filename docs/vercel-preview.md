@@ -4,14 +4,14 @@ This build lets organisers explore Newsletter Studio on a laptop or phone throug
 
 ## Deployment status
 
-The production build and three focused API tests pass. Publication has **not** been verified. Vercel returned `403 Forbidden` for the intended workspace, explicitly requiring re-authentication to that scope. An earlier direct deployment request was interrupted before a result was received, so its outcome is unknown. Check the project before issuing another deployment after access is restored.
+The preview is published at [sahaja-yoga-newsletter-studio.vercel.app](https://sahaja-yoga-newsletter-studio.vercel.app). The owner imported this repository through the Vercel dashboard after granting its GitHub integration access. GitHub reported a successful Vercel deployment and the owner confirmed the URL opens. The connected assistant's Vercel workspace access previously returned `403 Forbidden`; Git-linked updates can deploy independently of that connection.
 
 | Setting | Value |
 | --- | --- |
 | Vercel workspace | `nischal-neupanes-projects-2bf96b96` |
 | Confirmed workspace ID from the Vercel error | `team_X8G4JWGaqLto5qbg5flOKu5c` |
-| Separate newsletter project | `newsletter-sahajayoga-munich` |
-| Intended address, availability unverified | `newsletter-sahajayoga-munich.vercel.app` |
+| Separate newsletter project | `sahaja-yoga-newsletter-studio` |
+| Published address | `sahaja-yoga-newsletter-studio.vercel.app` |
 | Repository | `nneupane1/sahaja-yoga-newsletter-studio` |
 | Source root | Repository root |
 | Framework preset | Other |
@@ -42,6 +42,12 @@ Each friend has a separate browser workspace. Their changes do not synchronise t
 
 ## How the build works
 
+### Navigation on phones
+
+Below 768 px, a fixed Home / Editor / Newsletters / More bar makes the main destinations visible. More and the header menu open a modal drawer with the Sahaja Yoga logo and every desktop navigation entry. The drawer traps keyboard focus, supports Escape and outside-click dismissal, scrolls independently and closes on navigation. Changing to a desktop-sized viewport closes the mobile drawer.
+
+Content has extra bottom spacing, and the bar respects the phone's safe area. The bar hides while a writing field has focus. Editor-specific Add / Blocks / Design / Settings controls sit in the phone's top editor toolbar so there are no competing fixed bottom bars. Switching views uses the existing draft-save guard. The desktop sidebar retains its full width and layout.
+
 ```mermaid
 flowchart TD
     UI[Shared studio interface] --> API[Preview request handler]
@@ -67,7 +73,7 @@ node --test tests/share-preview.test.mjs
 
 For Git-linked Vercel deployment, import the newsletter repository into the named workspace as a separate project. The root `vercel.json` selects the preview build and output. No Sender token or production database variables should be added. Review the account's deployment protection setting to make sure the intended recipients can open the production address.
 
-For direct file deployment through the connected Vercel integration, build locally and generate the request:
+The legacy direct-file deployment helper uses the earlier proposed project name `newsletter-sahajayoga-munich`. Do not use it for routine updates to the published project, because that would target a different project. Routine updates should use this repository's Git-linked deployment. If explicitly setting up that separate project, build locally and generate the request:
 
 ```bash
 node scripts/vercel-static-payload.mjs
@@ -79,4 +85,4 @@ The script emits a production deployment request containing only the compiled pu
 
 Automated tests cover draft persistence through a fresh API instance, profile initials, preferences, four master templates, upload persistence, unsafe upload-format rejection, contact deduplication, dashboard composition and refusal to send or store provider credentials. TypeScript checking and the Vite production build pass.
 
-These tests use a storage adapter and do not replace browser verification of IndexedDB and service-worker behaviour. Desktop and mobile browser checks, live Vercel image loading and the production URL check remain pending. No real email was sent and no Vercel deployment success is claimed.
+These tests use a storage adapter and do not replace browser verification of IndexedDB and service-worker behaviour. The owner confirmed the production URL opens. Detailed browser checks and live image-upload verification remain pending; the automated browser binary could not be downloaded in the build environment. No real email was sent.

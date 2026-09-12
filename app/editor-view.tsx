@@ -151,6 +151,7 @@ export function EditorView() {
 
   const properties = <PropertyPanel selected={selected} update={updateSelected} move={move} duplicate={duplicate} remove={remove} replace={() => uploadInput.current?.click()} editImage={() => setImageStudioOpen(true)} createCollage={() => setCollageStudioOpen(true)} imageSlot={imageSlot} setImageSlot={setImageSlot} />;
   const settings = <EmailSettings subject={subject} setSubject={setSubject} preheader={preheader} setPreheader={setPreheader} fromName={fromName} setFromName={setFromName} replyTo={replyTo} setReplyTo={setReplyTo} />;
+  const compactTools = ([["content","Add",LayoutGrid],["blocks","Blocks",GripVertical],["design","Design",Palette],["settings","Settings",Settings2]] as const).map(([id,label,Icon]) => <button key={id} type="button" onClick={() => setMobilePanel(id)} className="focus-ring flex min-h-11 items-center justify-center gap-1 rounded-xl px-1 text-sm font-semibold text-[#54617c] hover:bg-[#eef3ff] hover:text-[#175cdf] md:flex-col"><Icon className="size-4 shrink-0" aria-hidden="true" />{label}</button>);
 
   return (
     <div className="-m-4 min-h-[calc(100vh-74px)] bg-[#eef1f6] md:-m-7">
@@ -161,6 +162,7 @@ export function EditorView() {
         <Button variant="outline" onClick={showTemplates}><LayoutTemplate /><span className="hidden sm:inline">Templates</span></Button><Button variant="outline" onClick={()=>setPreviewOpen(true)}><Monitor/><span className="hidden sm:inline">Email preview</span></Button>
         <Button variant="outline" onClick={() => save().catch((error) => toast.error(error.message))} disabled={saving||locked}><Save /><span className="hidden sm:inline">{saving ? "Saving…" : "Save"}</span></Button>
         <Button onClick={openSend} disabled={saving||locked} className="bg-[#155bd7]"><Send /><span className="hidden sm:inline">Review & send</span></Button>
+        <nav aria-label="Newsletter editing tools" className="grid w-full grid-cols-4 gap-1 border-t border-slate-100 pt-1 md:hidden">{compactTools}</nav>
       </div>
 
       <div className="grid min-h-[calc(100vh-145px)] xl:grid-cols-[200px_minmax(0,1fr)_280px] 2xl:grid-cols-[230px_minmax(0,1fr)_320px]">
@@ -178,9 +180,7 @@ export function EditorView() {
         <aside className="hidden h-[calc(100vh-145px)] overflow-y-auto border-l border-[#dfe4ed] bg-white p-5 xl:block"><fieldset disabled={locked}>{properties}<div className="mt-6 border-t border-[#e7eaf0] pt-5">{settings}</div></fieldset></aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[#dfe4ed] bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_35px_rgba(30,42,75,.12)] backdrop-blur-xl xl:hidden">
-        {([["content","Add",LayoutGrid],["blocks","Blocks",GripVertical],["design","Design",Palette],["settings","Settings",Settings2]] as const).map(([id,label,Icon]) => <button key={id} onClick={() => setMobilePanel(id)} className="focus-ring flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold text-[#54617c] hover:bg-[#eef3ff] hover:text-[#175cdf]"><Icon className="size-4" />{label}</button>)}
-      </div>
+      <nav aria-label="Newsletter editing tools" className="fixed inset-x-0 bottom-0 z-30 hidden grid-cols-4 border-t border-[#dfe4ed] bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_35px_rgba(30,42,75,.12)] backdrop-blur-xl md:left-[236px] md:grid xl:hidden">{compactTools}</nav>
 
       <Dialog open={mobilePanel !== null} onOpenChange={(open) => !open && setMobilePanel(null)}><DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle className="font-serif text-2xl">{mobilePanel === "content" ? "Add content" : mobilePanel === "blocks" ? "Newsletter blocks" : mobilePanel === "design" ? "Design selected block" : "Email settings"}</DialogTitle><DialogDescription>Changes appear immediately in the preview.</DialogDescription></DialogHeader>{mobilePanel === "content" && !locked && <ContentPalette add={add} />}{mobilePanel === "blocks" && <StructureList blocks={blocks} selectedId={selectedId} choose={(id) => { setSelectedId(id); setMobilePanel("design"); }} />}{mobilePanel === "design" && <fieldset disabled={locked}>{properties}</fieldset>}{mobilePanel === "settings" && <fieldset disabled={locked}>{settings}</fieldset>}</DialogContent></Dialog>
 
