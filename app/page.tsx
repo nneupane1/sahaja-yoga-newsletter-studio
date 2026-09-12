@@ -219,6 +219,7 @@ export default function Home() {
   return (
     <div className="studio-shell min-h-screen bg-transparent text-[#17213f]">
       <Toaster position="bottom-right" richColors />
+      {backendStatus?.runtime === "preview" && <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 md:ml-[236px]" role="note"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</div>}
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
       <aside className={`studio-sidebar fixed inset-y-0 left-0 z-50 flex w-[236px] flex-col border-r border-[#e4e8f1] bg-white transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}>

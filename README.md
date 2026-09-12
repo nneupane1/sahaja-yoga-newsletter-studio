@@ -1,11 +1,13 @@
 # Sahaja Yoga Newsletter Studio
 
+> **Shareable Vercel preview:** A separate static build now includes the responsive studio, four newsletter masters, saved drafts, editable organiser profile, notifications and browser-owned image uploads. See [Vercel preview deployment](docs/vercel-preview.md). Deployment is pending authorisation for the owner's Vercel workspace; the proposed hostname is not yet verified live.
+
 > **September 2026 update:** The home dashboard now restores the reference’s audience, engagement, link/content performance and campaign-history sections using saved records. Four source-informed templates, story/gallery editing, shared HTML preview, personalised greetings, notifications and reporting periods are described in [Newsletter design and dashboard integration](docs/newsletter-design.md). That document also identifies remaining delivery and legacy-screen limitations.
 
 
 An organiser-only newsletter, event communication, RSVP, and engagement workspace for Sahaja Yoga teams.
 
-The application gives a small group of experienced organisers a polished desktop workspace for preparing image-rich HTML newsletters, maintaining a subscriber list, sending through [Sender](https://www.sender.net/), and reviewing opens, clicks, bounces, unsubscribes, and RSVP-oriented link activity. Desktop operational data stays on the organiser's Windows computer; the web edition is a protected visual preview and does not hold Sender credentials.
+The application gives a small group of experienced organisers a polished desktop workspace for preparing image-rich HTML newsletters, maintaining a subscriber list, sending through [Sender](https://www.sender.net/), and reviewing opens, clicks, bounces, unsubscribes, and RSVP-oriented link activity. Desktop operational data stays on the organiser's Windows computer. The original hosted edition remains protected; a separate Vercel preview is designed for sharing sample workflows and stores its drafts and photos in each visitor's browser. Neither preview holds Sender credentials.
 
 > [!IMPORTANT]
 > This is an administration tool for authorised Sahaja Yoga event organisers. It is not a public class finder, meditation guide, attendee portal, or subscriber-facing application.
@@ -15,6 +17,7 @@ The application gives a small group of experienced organisers a polished desktop
 ## Table of contents
 
 - [Newsletter design and dashboard integration](docs/newsletter-design.md)
+- [Vercel preview deployment](docs/vercel-preview.md)
 - [Project status](#project-status)
 - [Why this exists](#why-this-exists)
 - [Product principles](#product-principles)
@@ -52,6 +55,7 @@ The application gives a small group of experienced organisers a polished desktop
 | Sender integration | Implemented | Connection test, subscriber sync, test send, schedule, campaign send, analytics |
 | Delivery safeguards | Implemented | Serialized calls, minimum request gap, retry handling, duplicate-send checks |
 | Hosted web edition | Preview | Protected visual/demo surface; production delivery is deliberately desktop-only |
+| Shareable Vercel build | Built and API-tested; deployment blocked | Browser-local drafts and uploads, sample analytics, no Sender credentials; workspace authorisation must be renewed before publishing |
 | Windows x64 ZIP | Verified | Portable package builds successfully; unsigned distribution requires normal Windows caution |
 | Live Sender acceptance test | Required | Must be completed with the organisers' verified domain, group, and API token before real distribution |
 

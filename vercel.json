@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run share:build",
+  "outputDirectory": "share-dist",
+  "rewrites": [{ "source": "/((?!api/|assets/|images/|asset-worker.js).*)", "destination": "/index.html" }],
+  "headers": [
+    { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }] },
+    { "source": "/asset-worker.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}
