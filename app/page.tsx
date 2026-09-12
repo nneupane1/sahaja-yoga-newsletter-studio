@@ -323,7 +323,7 @@ function Brand() {
 }
 
 function BrandLogo({ compact = false }: { compact?: boolean }) {
-  return <div className={`relative shrink-0 overflow-hidden rounded bg-white ${compact ? "h-[45px] w-[109px]" : "h-[50.4px] w-[128.8px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[777.7px]" : "w-[896px]"}`} /></div>;
+  return <div className={`relative shrink-0 overflow-hidden rounded mix-blend-multiply ${compact ? "h-[45px] w-[109px]" : "h-[50.4px] w-[128.8px]"}`} role="img" aria-label="Sahaja Yoga Newsletter Studio"><img src="/images/dashboard-reference.jpeg" alt="" className={`pointer-events-none absolute left-0 top-0 max-w-none ${compact ? "w-[777.7px]" : "w-[896px]"}`} /></div>;
 }
 
 function AccessScreen({ state }: { state: "loading" | "signed-out" | "forbidden" | "error" }) {
