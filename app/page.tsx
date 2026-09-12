@@ -227,7 +227,7 @@ export default function Home() {
     <div className="studio-shell min-h-screen bg-transparent text-[#17213f]">
       <div className="studio-atmosphere" aria-hidden="true"><div className="studio-wave"><svg viewBox="0 0 1440 1000" preserveAspectRatio="none" focusable="false"><path d="M-100 110 C280 480 650 -80 1540 210 L1540 410 C850 160 390 680 -100 280Z" fill="white" fillOpacity=".16"/><path d="M-100 650 C400 250 820 980 1540 400 L1540 680 C900 1150 320 520 -100 910Z" fill="#087f88" fillOpacity=".12"/><g fill="none" stroke="white" strokeOpacity=".28"><path d="M-100 210 C450 660 840 -120 1540 260"/><path d="M-100 228 C450 678 840 -102 1540 278"/><path d="M-100 250 C450 700 840 -80 1540 300"/><path d="M-100 760 C450 250 1000 1040 1540 490"/><path d="M-100 777 C450 267 1000 1057 1540 507"/></g></svg></div></div>
       <Toaster position="bottom-right" richColors />
-      {backendStatus?.runtime === "preview" && <div className="studio-preview-notice border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm leading-6 text-blue-900 md:ml-[236px] md:py-3" role="note"><span className="md:hidden"><b>Preview.</b> Sample data · browser-saved drafts · no sending.</span><span className="hidden md:inline"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</span></div>}
+      {backendStatus?.runtime === "preview" && <div className="studio-preview-notice border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm leading-6 text-blue-900 md:ml-[236px] md:py-3" role="note"><span className="md:hidden"><b>Preview.</b> Sample data · browser-saved drafts · no sending.</span><span className="hidden md:inline"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Explore populated sample campaigns, charts and reports.</span></div>}
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
       <aside className="studio-sidebar fixed inset-y-0 left-0 z-50 hidden w-[236px] flex-col border-r border-[#e4e8f1] bg-white md:flex">
@@ -304,7 +304,7 @@ export default function Home() {
           {activeView === "rsvps" && <RsvpView />}
           {activeView === "automations" && <AutomationsView values={automations} update={(key, checked) => setAutomations((old) => ({ ...old, [key]: checked }))} />}
           {activeView === "analytics" && <AnalyticsView />}
-          {activeView === "reports" && <ReportsView />}
+          {activeView === "reports" && <ReportsView workspace={workspace} />}
           {activeView === "settings" && <SettingsView />}
         </main>
       </div>
@@ -352,7 +352,7 @@ function NewslettersView({ newsletters, openComposer, preview }: { newsletters: 
   const [filter, setFilter] = useState("All");
   const [search,setSearch]=useState("");
   const [stored, setStored] = useState<Array<Newsletter & { backendId?: string }>>([]);
-  useEffect(() => { fetch("/api/campaigns").then((response) => response.json()).then((data: any) => { if (Array.isArray(data.campaigns)) setStored(data.campaigns.map((item: any) => ({ id: item.id, backendId: item.id, title: item.title, subject: item.subject, status: item.status === "draft" ? "Draft" : item.status === "scheduled" ? "Scheduled" : "Sent", date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "", sent: item.recipientCount || 0, openRate: 0, clickRate: 0, rsvps: 0 }))); }).catch(() => undefined); }, []);
+  useEffect(() => { fetch("/api/campaigns").then((response) => response.json()).then((data: any) => { if (Array.isArray(data.campaigns)) setStored(data.campaigns.map((item: any) => ({ id: item.id, backendId: item.id, title: item.title, subject: item.subject, status: item.status === "draft" ? "Draft" : item.status === "scheduled" ? "Scheduled" : "Sent", date: item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "", sent: item.recipientCount || 0, openRate: item.sampleMetrics ? Number((item.sampleMetrics.opened / item.sampleMetrics.delivered * 100).toFixed(1)) : 0, clickRate: item.sampleMetrics ? Number((item.sampleMetrics.clicked / item.sampleMetrics.delivered * 100).toFixed(1)) : 0, rsvps: item.sampleMetrics?.rsvps || 0 }))); }).catch(() => undefined); }, []);
   const allNewsletters = stored;
   const visible = allNewsletters.filter((item) => (filter === "All" || item.status === filter)&&`${item.title} ${item.subject}`.toLowerCase().includes(search.toLowerCase()));
   return (
@@ -469,9 +469,21 @@ function AnalyticsView() {
   );
 }
 
-function ReportsView() {
+function ReportsView({workspace}:{workspace:any}) {
+  const [sample,setSample]=useState<any>(null);
+  const campaignId=workspace?.campaign?.id||"",from=workspace?.preferences.from||"",to=workspace?.preferences.to||"";
+  useEffect(()=>{
+    const controller=new AbortController();
+    setSample(null);
+    if(!campaignId)return;
+    fetch("/api/dashboard?"+new URLSearchParams({campaignId,from,to}),{signal:controller.signal}).then(async r=>{if(!r.ok)return;const d:any=await r.json();if(d.sampleAnalytics)setSample(d);}).catch(()=>{});
+    return()=>controller.abort();
+  },[campaignId,from,to]);
+  const history=(sample?.history||[]).filter((c:any)=>c.sent>0);
+  const totals=history.reduce((a:any,c:any)=>({sent:a.sent+c.sent,opened:a.opened+c.opened,clicked:a.clicked+c.clicked}),{sent:0,opened:0,clicked:0});
+
   const reports = [["Monthly community pulse","Audience, engagement, and RSVP trends","PDF · Sep 2026"],["Campaign performance","Five most recent newsletters","CSV · Sep 2026"],["Event attendance","Registrations and expected guests","CSV · Sep 2026"],["Consent & subscription log","Signup and unsubscribe status","CSV · Sep 2026"]];
-  return <><PageHeading eyebrow="Shareable summaries" title="Reports" description="Turn the important numbers into simple updates for organizers and volunteers." actions={<Button onClick={() => toast.success("Report bundle prepared in demo mode")}><FileBarChart /> Create report</Button>} /><div className="grid gap-4 md:grid-cols-2">{reports.map(([title,description,meta], index) => <Panel key={title} className="p-5"><div className="flex items-start gap-4"><div className={`flex size-12 items-center justify-center rounded-xl ${index === 0 ? "bg-[#e8f8ef] text-[#168656]" : "bg-[#edf2ff] text-[#175cdf]"}`}><FileText className="size-5" /></div><div className="flex-1"><h3 className="font-serif text-[22px] font-semibold">{title}</h3><p className="mt-1 text-sm text-[#6f7b94]">{description}</p><p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-[#929bad]">{meta}</p></div><Button variant="outline" size="icon" onClick={() => toast.success(`${title} downloaded`)}><Download /></Button></div></Panel>)}</div></>;
+  return <><PageHeading eyebrow="Shareable summaries" title="Reports" description="Turn the important numbers into simple updates for organizers and volunteers." actions={<Button onClick={() => toast.success("Report bundle prepared in demo mode")}><FileBarChart /> Create report</Button>} />{sample&&<div className="mb-6 space-y-4"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Sample campaigns",history.length],["Emails sent",totals.sent],["Campaign opens",totals.opened],["Campaign clickers",totals.clicked]].map(([label,value])=><Panel key={String(label)} className="p-4"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-teal-700">{Number(value).toLocaleString()}</p></Panel>)}</div><Panel><PanelTitle title="Campaign comparison" caption="Illustrative sample results · opens and clicks as a percentage of delivered emails"/><div className="h-80 pr-4"><ResponsiveContainer width="100%" height="100%"><BarChart layout="vertical" data={history.map((c:any)=>({name:c.title.split(" ·")[0],opens:Number((c.opened/c.delivered*100).toFixed(1)),clicks:Number((c.clicked/c.delivered*100).toFixed(1))}))} margin={{left:0,right:12}}><CartesianGrid horizontal={false} stroke="#d7e7e4"/><XAxis type="number" unit="%" tick={{fontSize:11}} axisLine={false} tickLine={false}/><YAxis type="category" dataKey="name" width={135} tick={{fontSize:10}} axisLine={false} tickLine={false}/><ChartTooltip contentStyle={chartTooltipStyle}/><Bar dataKey="opens" name="Open rate (%)" fill="#7360c5" radius={[0,5,5,0]}/><Bar dataKey="clicks" name="Click rate (%)" fill="#159c94" radius={[0,5,5,0]}/></BarChart></ResponsiveContainer></div><p className="px-5 pb-4 text-xs text-slate-500"><span className="font-semibold text-[#7360c5]">Violet: opens</span> · <span className="font-semibold text-[#159c94]">Teal: clicks</span></p></Panel></div>}<div className="grid gap-4 md:grid-cols-2">{reports.map(([title,description,meta], index) => <Panel key={title} className="p-5"><div className="flex items-start gap-4"><div className={`flex size-12 items-center justify-center rounded-xl ${index === 0 ? "bg-[#e8f8ef] text-[#168656]" : "bg-[#edf2ff] text-[#175cdf]"}`}><FileText className="size-5" /></div><div className="flex-1"><h3 className="font-serif text-[22px] font-semibold">{title}</h3><p className="mt-1 text-sm text-[#6f7b94]">{description}</p><p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-[#929bad]">{meta}</p></div><Button variant="outline" size="icon" onClick={() => toast.success(`${title} downloaded`)}><Download /></Button></div></Panel>)}</div></>;
 }
 
 function SettingsView() {

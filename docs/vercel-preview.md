@@ -26,7 +26,7 @@ The existing Munich public website is a different project and must not be rename
 | Workflow | Preview behaviour |
 | --- | --- |
 | Dashboard | Saved campaign selection, date filters, five sample event images, history and link/content sections |
-| Engagement charts | Clearly identified example figures for the SY Europe Tour sample; new drafts have zero deliveries |
+| Engagement charts | Opens on SY Europe Tour with six populated sample campaigns, seven KPIs, five engagement groups, cumulative RSVP trends, six-month audience growth, ranked links and content; new drafts keep zero deliveries |
 | Newsletter templates | Four masters; the journal and invitation follow the two supplied newsletters |
 | Saved editions | Open browser-saved drafts or start a new edition from a sample |
 | Editor | Existing block, image, collage, HTML preview and export tools |
@@ -86,3 +86,5 @@ The script emits a production deployment request containing only the compiled pu
 Automated tests cover draft persistence through a fresh API instance, profile initials, preferences, four master templates, upload persistence, unsafe upload-format rejection, contact deduplication, dashboard composition and refusal to send or store provider credentials. TypeScript checking and the Vite production build pass.
 
 These tests use a storage adapter and do not replace browser verification of IndexedDB and service-worker behaviour. The owner confirmed the production URL opens. Detailed browser checks and live image-upload verification remain pending; the automated browser binary could not be downloaded in the build environment. No real email was sent.
+
+Sample analytics are illustrative and separate from imported contacts. A versioned preview migration preserves saved drafts, profiles, contacts and assets; it adds sent examples and replaces the old initial draft selection with SY Europe Tour. Selecting a user-created campaign remains a saved preference.
