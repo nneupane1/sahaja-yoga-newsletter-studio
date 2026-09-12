@@ -44,7 +44,7 @@ Each friend has a separate browser workspace. Their changes do not synchronise t
 
 ### Navigation on phones
 
-Below 768 px, a fixed Home / Editor / Newsletters / More bar makes the main destinations visible. More and the header menu open a modal drawer with the Sahaja Yoga logo and every desktop navigation entry. The drawer traps keyboard focus, supports Escape and outside-click dismissal, scrolls independently and closes on navigation. Changing to a desktop-sized viewport closes the mobile drawer.
+Below 768 px, the Sahaja Yoga logo stays visible in the header and links back to the dashboard. The home page displays every workspace section in a compact three-column grid above the dashboard, without requiring a menu tap. A fixed Home / Editor / Newsletters / More bar remains available across views. More opens a modal drawer containing every desktop navigation entry. The drawer traps keyboard focus, supports Escape and outside-click dismissal, scrolls independently and closes on navigation. Changing to a desktop-sized viewport closes the mobile drawer.
 
 Content has extra bottom spacing, and the bar respects the phone's safe area. The bar hides while a writing field has focus. Editor-specific Add / Blocks / Design / Settings controls sit in the phone's top editor toolbar so there are no competing fixed bottom bars. Switching views uses the existing draft-save guard. The desktop sidebar retains its full width and layout.
 

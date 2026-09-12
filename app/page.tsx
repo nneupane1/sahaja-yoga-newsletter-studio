@@ -14,7 +14,7 @@ import {
   Activity, ArrowDownToLine, ArrowRight, BarChart3, Bell, BookOpen, Calendar,
   CalendarDays, Check, CheckCircle2, ChevronDown, Clock3, Copy, Download,
   ExternalLink, Eye, FileBarChart, FileText, Gauge, Image as ImageIcon,
-  LayoutDashboard, Link2, Mail, MailCheck, MapPin, Menu, MessageCircle,
+  LayoutDashboard, Link2, Mail, MailCheck, MapPin, MessageCircle,
   MoreHorizontal, MousePointerClick, Plus, RefreshCw, Search, Send, Settings,
   SlidersHorizontal, Sparkles, Upload, UserCheck, UserPlus, Users, Workflow,
   X, Zap,
@@ -226,7 +226,7 @@ export default function Home() {
   return (
     <div className="studio-shell min-h-screen bg-transparent text-[#17213f]">
       <Toaster position="bottom-right" richColors />
-      {backendStatus?.runtime === "preview" && <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900 md:ml-[236px]" role="note"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</div>}
+      {backendStatus?.runtime === "preview" && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm leading-6 text-blue-900 md:ml-[236px] md:py-3" role="note"><span className="md:hidden"><b>Preview.</b> Sample data · browser-saved drafts · no sending.</span><span className="hidden md:inline"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</span></div>}
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
       <aside className="studio-sidebar fixed inset-y-0 left-0 z-50 hidden w-[236px] flex-col border-r border-[#e4e8f1] bg-white md:flex">
@@ -275,11 +275,11 @@ export default function Home() {
       </Sheet>
 
       <div className="md:pl-[236px]">
-        <header className="studio-header sticky top-0 z-30 flex min-h-[74px] items-center gap-3 border-b border-[#e5e9f1] bg-white/90 px-4 backdrop-blur-xl md:px-7">
-          <Button aria-label="Open workspace menu" aria-expanded={mobileNavOpen} aria-haspopup="dialog" variant="ghost" size="icon" onClick={() => setMobileNavOpen(true)} className="md:hidden"><Menu /></Button>
+        <header className="studio-header sticky top-0 z-30 flex min-h-[74px] items-center gap-2 border-b border-[#e5e9f1] bg-white/90 px-3 backdrop-blur-xl md:gap-3 md:px-7">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-bold uppercase tracking-[.1em] text-[#8b95ac]">Newsletter studio</p>
-            <h1 className="truncate text-[18px] font-bold tracking-[-.02em] md:text-[21px]">{viewTitle}</h1>
+            <button type="button" aria-label="Sahaja Yoga Newsletter Studio home" className="block rounded md:hidden" onClick={() => { if (activeView !== "dashboard") void changeView("dashboard"); }}><BrandLogo compact /></button>
+            <p className="hidden truncate text-[12px] font-bold uppercase tracking-[.1em] text-[#8b95ac] md:block">Newsletter studio</p>
+            <h1 className="hidden truncate text-[21px] font-bold tracking-[-.02em] md:block">{viewTitle}</h1>
           </div>
           <Badge variant="outline" className={`hidden px-3 py-1 md:inline-flex ${backendStatus?.provider?.connected ? "border-[#bce3cf] bg-[#eaf8f0] text-[#177c51]" : "border-[#f0d6ac] bg-[#fff8eb] text-[#9b5d18]"}`}>{backendStatus?.provider?.connected ? `${backendStatus.provider.name || "Sender"} · connected` : "Sender · setup required"}</Badge>
           <WorkspaceControls workspace={workspace} update={updateWorkspace} open={id=>{localStorage.setItem("sy-edit-campaign",id);changeView("editor");}} events={()=>changeView("events")}/>
@@ -287,6 +287,12 @@ export default function Home() {
         </header>
 
         <main className="studio-main mx-auto max-w-[1760px] p-4 md:p-7">
+          {activeView === "dashboard" && <nav aria-label="Workspace sections" className="studio-panel mb-5 p-3 md:hidden">
+            <p className="mb-2 px-1 text-sm font-semibold text-[#52617d]">Workspace</p>
+            <div className="grid grid-cols-3 gap-2">
+              {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} onClick={() => { if (activeView !== id) void changeView(id); }} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1 text-center text-sm font-medium leading-4 ${activeView === id ? "border-[#155bd7] bg-[#155bd7] text-white shadow-sm" : "border-[#e1eaf6] bg-white/85 text-[#405575] hover:border-blue-300 hover:bg-blue-50"}`}><Icon size={19} className="shrink-0" aria-hidden="true" /><span>{label}</span></button>)}
+            </div>
+          </nav>}
           {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
           {activeView === "editor" && <EditorView key={editorKey} />}
           {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
