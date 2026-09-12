@@ -65,7 +65,7 @@ export type AutomationKey = "welcome" | "eventReminder" | "weekly" | "followup";
 
 export const navItems: { id: ViewId; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "editor", label: "Newsletter editor", icon: Mail },
+  { id: "editor", label: "Newsletter Editor", icon: Mail },
   { id: "newsletters", label: "Newsletters", icon: Mail },
   { id: "events", label: "Events", icon: CalendarDays },
   { id: "meditation", label: "Weekly meditation", icon: HeartHandshake },

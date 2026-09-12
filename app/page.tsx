@@ -225,8 +225,9 @@ export default function Home() {
 
   return (
     <div className="studio-shell min-h-screen bg-transparent text-[#17213f]">
+      <div className="studio-atmosphere" aria-hidden="true"><div className="studio-wave"><svg viewBox="0 0 1440 1000" preserveAspectRatio="none" focusable="false"><path d="M-100 110 C280 480 650 -80 1540 210 L1540 410 C850 160 390 680 -100 280Z" fill="white" fillOpacity=".16"/><path d="M-100 650 C400 250 820 980 1540 400 L1540 680 C900 1150 320 520 -100 910Z" fill="#087f88" fillOpacity=".12"/><g fill="none" stroke="white" strokeOpacity=".28"><path d="M-100 210 C450 660 840 -120 1540 260"/><path d="M-100 228 C450 678 840 -102 1540 278"/><path d="M-100 250 C450 700 840 -80 1540 300"/><path d="M-100 760 C450 250 1000 1040 1540 490"/><path d="M-100 777 C450 267 1000 1057 1540 507"/></g></svg></div></div>
       <Toaster position="bottom-right" richColors />
-      {backendStatus?.runtime === "preview" && <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm leading-6 text-blue-900 md:ml-[236px] md:py-3" role="note"><span className="md:hidden"><b>Preview.</b> Sample data · browser-saved drafts · no sending.</span><span className="hidden md:inline"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</span></div>}
+      {backendStatus?.runtime === "preview" && <div className="studio-preview-notice border-b border-blue-200 bg-blue-50 px-4 py-2 text-sm leading-6 text-blue-900 md:ml-[236px] md:py-3" role="note"><span className="md:hidden"><b>Preview.</b> Sample data · browser-saved drafts · no sending.</span><span className="hidden md:inline"><b>Organiser preview.</b> Sample events and analytics; drafts and photos stay in this browser. No emails are sent. Select the SY Europe Tour sample campaign to explore engagement charts.</span></div>}
       <input ref={csvInput} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => importSubscribers(event.target.files?.[0])} />
 
       <aside className="studio-sidebar fixed inset-y-0 left-0 z-50 hidden w-[236px] flex-col border-r border-[#e4e8f1] bg-white md:flex">
@@ -238,7 +239,7 @@ export default function Home() {
               const Icon = item.icon;
               const active = activeView === item.id;
               return (
-                <button key={item.id} onClick={() => changeView(item.id)} className={`focus-ring flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-semibold transition ${active ? "bg-[#155bd7] text-white shadow-[0_7px_18px_rgba(21,91,215,.2)]" : "text-[#4e5b78] hover:bg-[#f0f4fb] hover:text-[#1f315d]"}`}>
+                <button key={item.id} data-section={item.id} aria-current={active ? "page" : undefined} onClick={() => changeView(item.id)} className={`focus-ring flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-semibold transition ${active ? "bg-[#155bd7] text-white shadow-[0_7px_18px_rgba(21,91,215,.2)]" : "text-[#4e5b78] hover:bg-[#f0f4fb] hover:text-[#1f315d]"}`}>
                   <Icon className="size-[18px]" strokeWidth={active ? 2.3 : 1.9} />
                   {item.label}
 
@@ -259,8 +260,8 @@ export default function Home() {
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <nav aria-label="Mobile workspace navigation" className="mobile-workspace-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 md:hidden">
-          {([{ id: "dashboard", label: "Home", Icon: LayoutDashboard }, { id: "editor", label: "Editor", Icon: FileText }, { id: "newsletters", label: "Newsletters", Icon: Mail }] as const).map(({ id, label, Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} className="mobile-workspace-tab" onClick={() => { if (activeView !== id) void changeView(id); }}><span className="mobile-workspace-icon"><Icon size={21} aria-hidden="true" /></span><span>{label}</span></button>)}
-          <SheetTrigger asChild><button type="button" className="mobile-workspace-tab" data-active={!["dashboard", "editor", "newsletters"].includes(activeView) || mobileNavOpen ? "true" : undefined} aria-label="More workspace sections"><span className="mobile-workspace-icon"><MoreHorizontal size={21} aria-hidden="true" /></span><span>More</span></button></SheetTrigger>
+          {([{ id: "dashboard", label: "Home", Icon: LayoutDashboard }, { id: "editor", label: "Newsletter Editor", Icon: FileText }, { id: "newsletters", label: "Newsletters", Icon: Mail }] as const).map(({ id, label, Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} className="mobile-workspace-tab" data-section={id} onClick={() => { if (activeView !== id) void changeView(id); }}><span className="mobile-workspace-icon"><Icon size={21} aria-hidden="true" /></span><span>{label}</span></button>)}
+          <SheetTrigger asChild><button type="button" className="mobile-workspace-tab" data-section="more" data-active={!["dashboard", "editor", "newsletters"].includes(activeView) || mobileNavOpen ? "true" : undefined} aria-label="More workspace sections"><span className="mobile-workspace-icon"><MoreHorizontal size={21} aria-hidden="true" /></span><span>More</span></button></SheetTrigger>
         </nav>
         <SheetContent side="left" showCloseButton={false} className="studio-mobile-drawer gap-0 border-white bg-[#f6faff]">
           <div className="flex shrink-0 items-center justify-between border-b border-blue-100 pr-3">
@@ -287,10 +288,10 @@ export default function Home() {
         </header>
 
         <main className="studio-main mx-auto max-w-[1760px] p-4 md:p-7">
-          {activeView === "dashboard" && <nav aria-label="Workspace sections" className="studio-panel mb-5 p-3 md:hidden">
+          {activeView === "dashboard" && <nav aria-label="Workspace sections" className="studio-panel studio-shortcuts mb-5 p-3 md:hidden">
             <p className="mb-2 px-1 text-sm font-semibold text-[#52617d]">Workspace</p>
             <div className="grid grid-cols-3 gap-2">
-              {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" aria-current={activeView === id ? "page" : undefined} onClick={() => { if (activeView !== id) void changeView(id); }} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1 text-center text-sm font-medium leading-4 ${activeView === id ? "border-[#155bd7] bg-[#155bd7] text-white shadow-sm" : "border-[#e1eaf6] bg-white/85 text-[#405575] hover:border-blue-300 hover:bg-blue-50"}`}><Icon size={19} className="shrink-0" aria-hidden="true" /><span>{label}</span></button>)}
+              {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" data-section={id} aria-current={activeView === id ? "page" : undefined} onClick={() => { if (activeView !== id) void changeView(id); }} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1 text-center text-sm font-medium leading-4 ${activeView === id ? "border-[#155bd7] bg-[#155bd7] text-white shadow-sm" : "border-[#e1eaf6] bg-white/85 text-[#405575] hover:border-blue-300 hover:bg-blue-50"}`}><Icon size={19} className="shrink-0" aria-hidden="true" /><span>{label}</span></button>)}
             </div>
           </nav>}
           {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
