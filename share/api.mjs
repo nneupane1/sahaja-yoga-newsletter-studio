@@ -66,12 +66,13 @@ export function previewDashboard(state, options) {
 
 // Serialized writes keep parallel requests in this tab from overwriting a save.
 // Each API request reads persisted state; no production server is contacted.
-export function createPreviewApi(store) {
+export function createPreviewApi(store, options = {}) {
   let queue = Promise.resolve();
   async function handle(request) {
+    const identity = typeof options.identity === "function" ? options.identity() : options.identity || null;
     const url = new URL(request.url), route = url.pathname, method = request.method;
     let state = await store.get("workspace");
-    if (!state) { state = seedPreview(); await store.set("workspace", state); }
+    if (!state) { state = seedPreview(); if (identity) state.prefs.displayName = identity.displayName; await store.set("workspace", state); }
     if (state.sampleDataVersion !== 2) {
       const examples = seedPreview().campaigns.filter(c => c.status === "sent");
       state.campaigns = [...state.campaigns.filter(c => !examples.some(e => e.id === c.id && c.status === "sent")), ...examples.filter(e => !state.campaigns.some(c => c.id === e.id && c.status !== "sent"))];
@@ -86,9 +87,9 @@ export function createPreviewApi(store) {
     if (route === "/api/status") return reply({ runtime: "preview", user: { name: state.prefs.displayName }, provider: { name: "Sender", connected: false }, counts: { campaigns: state.campaigns.length, subscribers: state.contacts.length, events: state.events.length }, storage: { database: true, images: true } });
     if (route === "/api/templates" && method === "GET") return reply({ templates: templateCatalog() });
     if (route === "/api/workspace") {
-      if (method === "PATCH") { state.prefs = validatePreferences(await request.json(), state.prefs); await save(); }
+      if (method === "PATCH") { const patch = await request.json(); if (identity && "displayName" in patch) return reply({error:"Update your name in Account & security."}, 400); state.prefs = validatePreferences(patch, state.prefs); await save(); }
       else if (method !== "GET") return reply({ error: "Method not allowed" }, 405);
-      return reply(workspacePayload({ userId: "preview-organiser", identitySource: "Preview profile · saved in this browser" }, state.prefs, state.campaigns, state.events));
+      return reply(workspacePayload(identity || { userId: "preview-organiser", identitySource: "Preview profile · saved in this browser" }, identity ? { ...state.prefs, displayName: identity.displayName } : state.prefs, state.campaigns, state.events));
     }
     if (route === "/api/dashboard" && method === "GET") return reply(previewDashboard(state, validatePreferences(Object.fromEntries(url.searchParams))));
     if (route === "/api/analytics") {
@@ -139,7 +140,7 @@ export function createPreviewApi(store) {
       const form = await request.formData(), file = form.get("file");
       if (!(file instanceof Blob) || !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) || file.size > 15 * 1024 * 1024) return reply({ error: "Choose a PNG, JPEG, WebP or GIF image under 15 MB." }, 400);
       const id = crypto.randomUUID(); await store.set(`asset:${id}`, file);
-      return reply({ asset: { id, url: `/api/assets/${id}` } }, 201);
+      return reply({ asset: { id, url: `/api/assets/${id}${identity ? "?account=" + encodeURIComponent(identity.userId) : ""}` } }, 201);
     }
     return reply({ error: "This action is not available in the shareable preview." }, 404);
   }

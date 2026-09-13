@@ -1,5 +1,7 @@
 # Shareable Vercel preview
 
+> **Authentication branch:** The code now includes an organiser registration/login gate. It is not deployed, and automatic Vercel Git deployments are disabled on this branch. Follow [the authentication setup guide](organiser-authentication.md) before the owner requests the next deployment. The public preview described below remains the currently deployed version.
+
 This build lets organisers explore Newsletter Studio on a laptop or phone through a standard Vercel address. It uses the existing studio components and newsletter renderer, including both source-informed master templates and the collage editor. It is a demonstration workspace for the organising team, not an attendee website.
 
 ## Deployment status

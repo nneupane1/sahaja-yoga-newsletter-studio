@@ -1,4 +1,5 @@
 "use client";
+import { studioLocalStorage } from "../lib/browser-preferences.mjs";
 /* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
 
 import { DashboardView } from "./dashboard-view";
@@ -79,7 +80,7 @@ function usePersistentState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem(key);
+      const saved = studioLocalStorage.getItem(key);
       if (saved) setValue(JSON.parse(saved));
     } catch { /* keep demo defaults */ }
     hydrated.current = true;
@@ -87,13 +88,13 @@ function usePersistentState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     if (!hydrated.current) return;
-    window.localStorage.setItem(key, JSON.stringify(value));
+    studioLocalStorage.setItem(key, JSON.stringify(value));
   }, [key, value]);
 
   return [value, setValue] as const;
 }
 
-export default function Home() {
+export default function Home({ accountControls }: { accountControls?: ReactNode } = {}) {
   const [access, setAccess] = useState<"loading" | "ready" | "signed-out" | "forbidden" | "error">("loading");
   const [backendStatus, setBackendStatus] = useState<{ runtime?: string; provider?: { connected?: boolean; name?: string; listName?: string; memberCount?: number }; counts?: { campaigns?: number; subscribers?: number; events?: number } } | null>(null);
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
@@ -283,7 +284,7 @@ export default function Home() {
             <h1 className="hidden truncate text-[21px] font-bold tracking-[-.02em] md:block">{viewTitle}</h1>
           </div>
           <Badge variant="outline" className={`hidden px-3 py-1 md:inline-flex ${backendStatus?.provider?.connected ? "border-[#bce3cf] bg-[#eaf8f0] text-[#177c51]" : "border-[#f0d6ac] bg-[#fff8eb] text-[#9b5d18]"}`}>{backendStatus?.provider?.connected ? `${backendStatus.provider.name || "Sender"} · connected` : "Sender · setup required"}</Badge>
-          <WorkspaceControls workspace={workspace} update={updateWorkspace} open={id=>{localStorage.setItem("sy-edit-campaign",id);changeView("editor");}} events={()=>changeView("events")}/>
+          <WorkspaceControls accountControls={accountControls} workspace={workspace} update={updateWorkspace} open={id=>{studioLocalStorage.setItem("sy-edit-campaign",id);changeView("editor");}} events={()=>changeView("events")}/>
 
         </header>
 
@@ -294,9 +295,9 @@ export default function Home() {
               {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" data-section={id} aria-current={activeView === id ? "page" : undefined} onClick={() => { if (activeView !== id) void changeView(id); }} className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-1 text-center text-sm font-medium leading-4 ${activeView === id ? "border-[#155bd7] bg-[#155bd7] text-white shadow-sm" : "border-[#e1eaf6] bg-white/85 text-[#405575] hover:border-blue-300 hover:bg-blue-50"}`}><Icon size={19} className="shrink-0" aria-hidden="true" /><span>{label}</span></button>)}
             </div>
           </nav>}
-          {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)localStorage.setItem("sy-edit-campaign",id);else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
+          {activeView === "dashboard" && <DashboardView workspace={workspace} updateWorkspace={updateWorkspace} workspaceError={workspaceError} changeView={changeView} importCsv={()=>csvInput.current?.click()} openNewsletter={(id) => { if(id)studioLocalStorage.setItem("sy-edit-campaign",id);else studioLocalStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} />}
           {activeView === "editor" && <EditorView key={editorKey} />}
-          {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) localStorage.setItem("sy-edit-campaign", id); else localStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
+          {activeView === "newsletters" && <NewslettersView newsletters={newsletters} openComposer={(id) => { if (id) studioLocalStorage.setItem("sy-edit-campaign", id); else studioLocalStorage.removeItem("sy-edit-campaign"); changeView("editor"); }} preview={setPreviewNewsletter} />}
           {activeView === "events" && <EventsView events={events} openEvent={() => setEventOpen(true)} />}
           {activeView === "meditation" && <MeditationView />}
           {activeView === "content" && <ContentView />}

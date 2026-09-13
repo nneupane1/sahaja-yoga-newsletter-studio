@@ -3,9 +3,66 @@
   "framework": null,
   "buildCommand": "npm run share:build",
   "outputDirectory": "share-dist",
-  "rewrites": [{ "source": "/((?!api/|assets/|images/|asset-worker.js).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/api/((?!auth$|protected$).*)",
+      "destination": "/api/protected"
+    },
+    {
+      "source": "/((?!api/|assets/|images/|asset-worker.js).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
-    { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }] },
-    { "source": "/asset-worker.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
-  ]
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss://*.supabase.co; frame-src 'self' blob: https://challenges.cloudflare.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        }
+      ]
+    },
+    {
+      "source": "/asset-worker.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store, max-age=0"
+        }
+      ]
+    }
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }

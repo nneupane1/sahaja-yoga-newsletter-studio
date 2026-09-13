@@ -172,3 +172,10 @@ button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
   body:has(input:focus,textarea:focus,[contenteditable="true"]:focus) .mobile-workspace-nav { visibility:hidden; pointer-events:none; }
   .studio-shell [data-sonner-toaster] { bottom:calc(5.5rem + env(safe-area-inset-bottom,0px)) !important; }
 }
+
+/* Account screens share the studio palette; provider forms remain accessible. */
+.auth-action { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; min-height:44px; padding:.65rem 1rem; border:1px solid #96c8c0; border-radius:12px; background:#e6f4ed; color:#1c5556; font-size:14px; font-weight:600; }
+.auth-action:hover { background:#d1eae3; }
+.auth-action:focus-visible { outline:3px solid #166f8e; outline-offset:3px; }
+.auth-action:disabled { opacity:.6; cursor:wait; }
+.studio-auth-screen { background:radial-gradient(ellipse at top left,#e8f8edaa,transparent 65%); }

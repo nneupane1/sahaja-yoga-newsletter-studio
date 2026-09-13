@@ -1,4 +1,5 @@
 "use client";
+import { studioLocalStorage } from "../lib/browser-preferences.mjs";
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
 import { useEffect, useRef, useState } from "react";
@@ -94,10 +95,10 @@ export function EditorView() {
   const selected = blocks.find((block) => block.id === selectedId) || blocks[0];
 
   useEffect(() => {
-    const id = localStorage.getItem("sy-edit-campaign"); if (!id) {setSavedSnapshot(snapshot);return;}
+    const id = studioLocalStorage.getItem("sy-edit-campaign"); if (!id) {setSavedSnapshot(snapshot);return;}
     fetch(`/api/campaigns/${id}`).then((response) => response.json()).then((data: any) => {
       if (!data.campaign) throw new Error(data.error || "Could not load newsletter");
-      const item = data.campaign; setSourceStatus(item.providerCampaignId ? "connected" : item.status); setSavedSnapshot(JSON.stringify({title:item.title,subject:item.subject,preheader:item.preheader||"",fromName:item.fromName||"Sahaja Yoga Newsletter",replyTo:item.replyTo||"",blocks:item.blocks})); setCampaignId(item.id); setTitle(item.title); setSubject(item.subject); setPreheader(item.preheader || ""); setFromName(item.fromName || "Sahaja Yoga Newsletter"); setReplyTo(item.replyTo || ""); setBlocks(item.blocks); if (item.blocks[0]) setSelectedId(item.blocks[0].id); localStorage.removeItem("sy-edit-campaign");
+      const item = data.campaign; setSourceStatus(item.providerCampaignId ? "connected" : item.status); setSavedSnapshot(JSON.stringify({title:item.title,subject:item.subject,preheader:item.preheader||"",fromName:item.fromName||"Sahaja Yoga Newsletter",replyTo:item.replyTo||"",blocks:item.blocks})); setCampaignId(item.id); setTitle(item.title); setSubject(item.subject); setPreheader(item.preheader || ""); setFromName(item.fromName || "Sahaja Yoga Newsletter"); setReplyTo(item.replyTo || ""); setBlocks(item.blocks); if (item.blocks[0]) setSelectedId(item.blocks[0].id); studioLocalStorage.removeItem("sy-edit-campaign");
     }).catch((error) => toast.error(error instanceof Error ? error.message : "Could not load newsletter"));
   }, []);
 

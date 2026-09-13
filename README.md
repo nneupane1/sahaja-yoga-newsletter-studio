@@ -1,5 +1,7 @@
 # Sahaja Yoga Newsletter Studio
 
+> **Organiser authentication — GitHub branch, not deployed:** Registration, verified-email login, password recovery, optional Google sign-in and authenticator verification are implemented for the Vercel version. Only approved organisers can enter, and local drafts/images are separated by account. See [account setup and testing](docs/organiser-authentication.md). Supabase and authentication email configuration are required before real registrations. Automatic Vercel Git deployments are disabled on this branch; the existing public preview is unchanged.
+
 > **[Open the shareable preview](https://sahaja-yoga-newsletter-studio.vercel.app):** The separate Vercel build includes the responsive studio, four newsletter masters, saved drafts, editable organiser profile, notifications and browser-owned image uploads. Phones have a visible Home / Editor / Newsletters / More navigation bar; More opens all workspace sections. See [Vercel preview deployment](docs/vercel-preview.md).
 
 > **September 2026 update:** The home dashboard now restores the reference’s audience, engagement, link/content performance and campaign-history sections using saved records. Four source-informed templates, story/gallery editing, shared HTML preview, personalised greetings, notifications and reporting periods are described in [Newsletter design and dashboard integration](docs/newsletter-design.md). That document also identifies remaining delivery and legacy-screen limitations.
@@ -16,6 +18,7 @@ The application gives a small group of experienced organisers a polished desktop
 
 ## Table of contents
 
+- [Organiser registration, login and security](docs/organiser-authentication.md)
 - [Newsletter design and dashboard integration](docs/newsletter-design.md)
 - [Vercel preview deployment](docs/vercel-preview.md)
 - [Project status](#project-status)
@@ -49,6 +52,7 @@ The application gives a small group of experienced organisers a polished desktop
 
 | Area | Status | Notes |
 | --- | --- | --- |
+| Vercel organiser accounts | Implemented on authentication branch; not deployed | Supabase verification, approval, password recovery, optional Google/TOTP, session revocation and account isolation; provider configuration and real-email acceptance checks required |
 | Organiser dashboard | Implemented | Saved campaign, audience, engagement, link/content performance, history and event sections; some older secondary screens remain demonstrations |
 | Newsletter editor | Implemented | Block editing, desktop/mobile preview, image studio, HTML generation |
 | Windows local backend | Implemented | Loopback-only HTTP API, SQLite, media store, project exports, backups |
